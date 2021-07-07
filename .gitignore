@@ -1,3 +1,8 @@
+build/
+
+# VIM droppings
+*.swp
+
 # Prerequisites
 *.d
 
