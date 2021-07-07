@@ -1,0 +1,6 @@
+[submodule "thirdparty/DiligentEngine"]
+	path = thirdparty/DiligentEngine
+	url = https://github.com/DiligentGraphics/DiligentEngine.git
+[submodule "thirdparty/OpenXR-SDK"]
+	path = thirdparty/OpenXR-SDK
+	url = https://github.com/KhronosGroup/OpenXR-SDK.git
