@@ -70,6 +70,9 @@
 
 #include "Common/interface/RefCntAutoPtr.hpp"
 
+#include "openxr/openxr.h"
+#include "openxr/openxr_platform.h"
+
 using namespace Diligent;
 
 // For this tutorial, we will use simple vertex shader
@@ -138,6 +141,8 @@ public:
 
     bool InitializeDiligentEngine(HWND hWnd)
     {
+        xrCreateInstance( nullptr, nullptr );
+
         SwapChainDesc SCDesc;
         switch (m_DeviceType)
         {
