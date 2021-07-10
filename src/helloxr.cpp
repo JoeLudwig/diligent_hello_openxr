@@ -28,6 +28,9 @@
 #include <memory>
 #include <iomanip>
 #include <iostream>
+#include <vector>
+#include <string>
+#include <map>
 
 #ifndef NOMINMAX
 #    define NOMINMAX
@@ -71,6 +74,27 @@
 #include "Common/interface/RefCntAutoPtr.hpp"
 
 #include "openxr/openxr.h"
+
+// Make sure the supported OpenXR graphics APIs are defined
+#if D3D11_SUPPORTED
+#include <d3d11.h>
+#    define XR_USE_GRAPHICS_API_D3D11
+#endif
+
+#if D3D12_SUPPORTED
+#include <d3d12.h>
+#    define XR_USE_GRAPHICS_API_D3D12
+#endif
+
+#if GL_SUPPORTED
+#    define XR_USE_GRAPHICS_API_OPENGL
+#endif
+
+#if VULKAN_SUPPORTED
+#    define XR_USE_GRAPHICS_API_VULKAN
+#include <vulkan/vulkan.h>
+#endif
+
 #include "openxr/openxr_platform.h"
 
 using namespace Diligent;
@@ -126,22 +150,58 @@ void main(in  PSInput  PSIn,
 }
 )";
 
+typedef std::map< std::string, uint32_t > XrExtensionMap;
 
-class Tutorial00App
+XrExtensionMap GetAvailableOpenXRExtensions()
+{
+    uint32_t neededSize = 0;
+    if ( XR_FAILED( xrEnumerateInstanceExtensionProperties( nullptr, 0, &neededSize, nullptr ) ) )
+    {
+        return {};
+    }
+
+    if ( !neededSize )
+    {
+        // How can a runtime not enumerate at least one graphics binding extension?
+        return {};
+    }
+
+    std::vector< XrExtensionProperties > properties;
+    properties.resize( neededSize, { XR_TYPE_EXTENSION_PROPERTIES } );
+    uint32_t readSize = 0;
+    if ( XR_FAILED( xrEnumerateInstanceExtensionProperties( nullptr, neededSize, &readSize, &properties[ 0 ] ) ) )
+    {
+        return {};
+    }
+
+    XrExtensionMap res;
+    for ( auto& prop : properties )
+    {
+        res.insert( std::make_pair( std::string( prop.extensionName ), prop.extensionVersion ) );
+    }
+    return res;
+}
+
+
+class HelloXrApp
 {
 public:
-    Tutorial00App()
+    HelloXrApp()
     {
     }
 
-    ~Tutorial00App()
+    ~HelloXrApp()
     {
         m_pImmediateContext->Flush();
     }
 
-    bool InitializeDiligentEngine(HWND hWnd)
+    bool Initialize(HWND hWnd)
     {
-        xrCreateInstance( nullptr, nullptr );
+		// create the OpenXR instance first because it will have an opinion about device creation
+        if( !InitializeOpenXr() )
+        {
+            return false;
+        }
 
         SwapChainDesc SCDesc;
         switch (m_DeviceType)
@@ -229,6 +289,79 @@ public:
 
         return true;
     }
+
+
+    bool InitializeOpenXr()
+    {
+        XrExtensionMap availableExtensions = GetAvailableOpenXRExtensions();
+
+         std::vector< std::string > xrExtensions;
+
+        switch ( m_DeviceType )
+        {
+#if D3D11_SUPPORTED
+        case RENDER_DEVICE_TYPE_D3D11:
+        {
+            xrExtensions.push_back( XR_KHR_D3D11_ENABLE_EXTENSION_NAME );
+        }
+        break;
+#endif
+
+
+#if D3D12_SUPPORTED
+        case RENDER_DEVICE_TYPE_D3D12:
+        {
+            xrExtensions.push_back( XR_KHR_D3D12_ENABLE_EXTENSION_NAME );
+        }
+        break;
+#endif
+
+
+#if GL_SUPPORTED
+        case RENDER_DEVICE_TYPE_GL:
+        {
+            xrExtensions.push_back( XR_KHR_OPENGL_ENABLE_EXTENSION_NAME );
+        }
+        break;
+#endif
+
+
+#if VULKAN_SUPPORTED
+        case RENDER_DEVICE_TYPE_VULKAN:
+        {
+            xrExtensions.push_back( XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME );
+        }
+        break;
+#endif
+        }
+
+        if ( xrExtensions.empty() )
+        {
+            // we can't create an instance without at least a graphics extension
+            return false;
+        }
+
+        // CODE GOES HERE: Add any additional extensions required by your application
+
+        std::vector<const char*> extensionPointers;
+        for ( auto& ext : xrExtensions )
+        {
+            extensionPointers.push_back( ext.c_str() );
+        }
+
+        XrInstanceCreateInfo createInfo = { XR_TYPE_INSTANCE_CREATE_INFO };
+        createInfo.enabledExtensionCount = (uint32_t)extensionPointers.size();
+        createInfo.enabledExtensionNames = &extensionPointers[ 0 ];
+        strcpy_s( createInfo.applicationInfo.applicationName, "Hello Diligent XR" );
+        createInfo.applicationInfo.applicationVersion = 1;
+        strcpy_s( createInfo.applicationInfo.engineName, "DiligentEngine" );
+        createInfo.applicationInfo.engineVersion = DILIGENT_API_VERSION;
+        createInfo.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
+
+        XrResult res = xrCreateInstance( &createInfo, &m_instance );
+        return XR_SUCCEEDED( res );
+    }
+
 
     bool ProcessCommandLine(const char* CmdLine)
     {
@@ -399,9 +532,12 @@ private:
     RefCntAutoPtr<ISwapChain>     m_pSwapChain;
     RefCntAutoPtr<IPipelineState> m_pPSO;
     RENDER_DEVICE_TYPE            m_DeviceType = RENDER_DEVICE_TYPE_D3D11;
+
+    XrInstance m_instance;
+    XrSession m_session;
 };
 
-std::unique_ptr<Tutorial00App> g_pTheApp;
+std::unique_ptr<HelloXrApp> g_pTheApp;
 
 LRESULT CALLBACK MessageProc(HWND, UINT, WPARAM, LPARAM);
 // Main
@@ -411,7 +547,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int cmdShow)
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
 
-    g_pTheApp.reset(new Tutorial00App);
+    g_pTheApp.reset(new HelloXrApp);
 
     const auto* cmdLine = GetCommandLineA();
     if (!g_pTheApp->ProcessCommandLine(cmdLine))
@@ -446,7 +582,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int cmdShow)
     ShowWindow(wnd, cmdShow);
     UpdateWindow(wnd);
 
-    if (!g_pTheApp->InitializeDiligentEngine(wnd))
+    if (!g_pTheApp->Initialize(wnd))
         return -1;
 
     g_pTheApp->CreateResources();

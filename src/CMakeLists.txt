@@ -6,16 +6,19 @@ target_include_directories(HelloDiligentXr
 PRIVATE 
     "../thirdparty/DiligentEngine/DiligentCore"
     "../thirdparty/OpenXR-SDK/include"
+
+    # for VulkanHeaders
+    "../thirdparty/DiligentEngine/DiligentCore/ThirdParty/Vulkan-Headers/include"
 )
 
 add_dependencies( HelloDiligentXr openxr_loader )
 
 target_link_libraries(HelloDiligentXr
 PRIVATE
-#    Diligent-GraphicsEngineD3D11-shared
-#    Diligent-GraphicsEngineOpenGL-shared
-#    Diligent-GraphicsEngineD3D12-shared
-    Diligent-GraphicsEngineVk-shared
+    Diligent-GraphicsEngineD3D11-shared
+    Diligent-GraphicsEngineOpenGL-shared
+    Diligent-GraphicsEngineD3D12-shared
+#    Diligent-GraphicsEngineVk-shared
     openxr_loader
 )
 copy_required_dlls(HelloDiligentXr)
