@@ -79,11 +79,13 @@
 #if D3D11_SUPPORTED
 #include <d3d11.h>
 #    define XR_USE_GRAPHICS_API_D3D11
+#include "Graphics/GraphicsEngineD3D11/interface/RenderDeviceD3D11.h"
 #endif
 
 #if D3D12_SUPPORTED
 #include <d3d12.h>
 #    define XR_USE_GRAPHICS_API_D3D12
+#include "Graphics/GraphicsEngineD3D12/interface/RenderDeviceD3D12.h"
 #endif
 
 #if GL_SUPPORTED
@@ -96,6 +98,13 @@
 #endif
 
 #include "openxr/openxr_platform.h"
+
+#define CHECK_XR_RESULT( res ) \
+    do { \
+        if( FAILED( res ) ) \
+            return false; \
+    } \
+    while ( 0 );
 
 using namespace Diligent;
 
@@ -251,6 +260,7 @@ public:
 
                 EngineD3D11CreateInfo EngineCI;
                 EngineCI.AdapterId = GetAdapterIndexFromLuid( graphicsRequirements.adapterLuid );
+                EngineCI.GraphicsAPIVersion = Version { 11, 0 };
 #    if ENGINE_DLL
                 // Load the dll and import GetEngineFactoryD3D11() function
                 auto* GetEngineFactoryD3D11 = LoadGraphicsEngineD3D11();
@@ -281,6 +291,7 @@ public:
 #    endif
                 EngineD3D12CreateInfo EngineCI;
 				EngineCI.AdapterId = GetAdapterIndexFromLuid( graphicsRequirements.adapterLuid );
+				EngineCI.GraphicsAPIVersion = Version { 12, 0 };
 
                 auto* pFactoryD3D12 = GetEngineFactoryD3D12();
                 pFactoryD3D12->CreateDeviceAndContextsD3D12(EngineCI, &m_pDevice, &m_pImmediateContext);
@@ -347,6 +358,9 @@ public:
                 return false;
                 break;
         }
+
+        if ( !CreateSession() )
+            return false;
 
         return true;
     }
@@ -429,7 +443,114 @@ public:
         getInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
         res = xrGetSystem( m_instance, &getInfo, &m_systemId );
 
+        if ( XR_FAILED( res ) )
+        {
+            return false;
+        }
+
+        m_views[ 0 ].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
+		m_views[ 1 ].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
+
+        uint32_t viewCountOutput = 0;
+        if ( XR_FAILED( xrEnumerateViewConfigurationViews( m_instance, m_systemId, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+            2, &viewCountOutput, m_views ) ) )
+        {
+            return false;
+        }
+
         return XR_SUCCEEDED( res );
+    }
+
+    bool CreateSession()
+    {
+        XrSessionCreateInfo createInfo = { XR_TYPE_SESSION_CREATE_INFO };
+        createInfo.systemId = m_systemId;
+        createInfo.createFlags = 0;
+
+        std::vector< int64_t > requestedFormats;
+        switch ( m_DeviceType )
+        {
+#if D3D11_SUPPORTED
+		case RENDER_DEVICE_TYPE_D3D11:
+		{
+            requestedFormats.push_back( DXGI_FORMAT_R16G16B16A16_FLOAT );
+			requestedFormats.push_back( DXGI_FORMAT_R8G8B8A8_UNORM );
+
+            static XrGraphicsBindingD3D11KHR d3d11Binding = { XR_TYPE_GRAPHICS_BINDING_D3D11_KHR };
+            createInfo.next = &d3d11Binding;
+
+            d3d11Binding.device = GetD3D11Device()->GetD3D11Device();
+		}
+		break;
+#endif
+
+
+#if D3D12_SUPPORTED
+		case RENDER_DEVICE_TYPE_D3D12:
+		{
+			requestedFormats.push_back( DXGI_FORMAT_R16G16B16A16_FLOAT );
+			requestedFormats.push_back( DXGI_FORMAT_R8G8B8A8_UNORM );
+
+			static XrGraphicsBindingD3D12KHR d3d12Binding = { XR_TYPE_GRAPHICS_BINDING_D3D12_KHR };
+			createInfo.next = &d3d12Binding;
+
+			d3d12Binding.device = GetD3D12Device()->GetD3D12Device();
+		}
+		break;
+#endif
+
+
+#if GL_SUPPORTED
+		case RENDER_DEVICE_TYPE_GL:
+		{
+		}
+		break;
+#endif
+
+
+#if VULKAN_SUPPORTED
+		case RENDER_DEVICE_TYPE_VULKAN:
+		{
+		}
+		break;
+#endif
+        }
+
+        CHECK_XR_RESULT( xrCreateSession( m_instance, &createInfo, &m_session ) );
+
+        uint32_t swapchainFormatCount;
+        CHECK_XR_RESULT( xrEnumerateSwapchainFormats( m_session, 0, &swapchainFormatCount, nullptr ) );
+        std::vector<int64_t> supportedFormats;
+        supportedFormats.resize( swapchainFormatCount );
+		CHECK_XR_RESULT( xrEnumerateSwapchainFormats( m_session, swapchainFormatCount, &swapchainFormatCount, &supportedFormats[0] ) );
+        if ( requestedFormats.empty() || supportedFormats.empty() )
+            return false;
+
+        XrSwapchainCreateInfo scCreateInfo = { XR_TYPE_SWAPCHAIN_CREATE_INFO };
+        scCreateInfo.arraySize = 2;
+        scCreateInfo.width = m_views[ 0 ].recommendedImageRectWidth;
+		scCreateInfo.height = m_views[ 0 ].recommendedImageRectHeight;
+        scCreateInfo.createFlags = 0;
+        scCreateInfo.format = supportedFormats[ 0 ];
+        scCreateInfo.mipCount = 1;
+        scCreateInfo.sampleCount = 1;
+        scCreateInfo.faceCount = 1;
+
+        // find the format on our list that's earliest on the runtime's list
+        for ( int64_t supported : supportedFormats )
+        {
+            if ( std::find( requestedFormats.begin(), requestedFormats.end(), supported )
+                != requestedFormats.end() )
+            {
+                scCreateInfo.format = supported;
+                break;
+            }
+        }
+
+        CHECK_XR_RESULT( xrCreateSwapchain( m_session, &scCreateInfo, &m_swapchain ) );
+
+        return true;
+
     }
 
 
@@ -497,6 +618,14 @@ public:
         return true;
     }
 
+
+#if D3D11_SUPPORTED
+    IRenderDeviceD3D11* GetD3D11Device() { return (IRenderDeviceD3D11 *)m_pDevice.RawPtr(); }
+#endif
+
+#if D3D12_SUPPORTED
+	IRenderDeviceD3D12* GetD3D12Device() { return (IRenderDeviceD3D12*)m_pDevice.RawPtr(); }
+#endif
 
     void CreateResources()
     {
@@ -606,6 +735,8 @@ private:
     XrInstance m_instance;
     XrSystemId m_systemId;
     XrSession m_session;
+    XrViewConfigurationView m_views[ 2 ] = {};
+    XrSwapchain m_swapchain = XR_NULL_HANDLE;
 };
 
 std::unique_ptr<HelloXrApp> g_pTheApp;
@@ -720,3 +851,7 @@ LRESULT CALLBACK MessageProc(HWND wnd, UINT message, WPARAM wParam, LPARAM lPara
             return DefWindowProc(wnd, message, wParam, lParam);
     }
 }
+
+// TODO:
+// - Vulkan device creation needs to happen in the runtime
+// - D3D12 session creation needs to include a command queue
