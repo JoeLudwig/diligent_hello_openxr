@@ -20,5 +20,6 @@ PRIVATE
     Diligent-GraphicsEngineD3D12-shared
 #    Diligent-GraphicsEngineVk-shared
     openxr_loader
+    DXGI
 )
 copy_required_dlls(HelloDiligentXr)

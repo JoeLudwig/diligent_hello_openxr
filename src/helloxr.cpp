@@ -182,6 +182,38 @@ XrExtensionMap GetAvailableOpenXRExtensions()
     return res;
 }
 
+#if D3D11_SUPPORTED || D3D12_SUPPORTED
+#include <wrl/client.h>
+
+UINT GetAdapterIndexFromLuid( LUID adapterId ) 
+{
+	// Create the DXGI factory.
+    Microsoft::WRL::ComPtr<IDXGIFactory1> dxgiFactory;
+    if ( FAILED( CreateDXGIFactory1( __uuidof( IDXGIFactory1 ), reinterpret_cast<void**>( dxgiFactory.ReleaseAndGetAddressOf() ) ) ) )
+        return 0;
+
+	for ( UINT adapterIndex = 0;; adapterIndex++ ) 
+    {
+		// EnumAdapters1 will fail with DXGI_ERROR_NOT_FOUND when there are no more adapters to enumerate.
+        Microsoft::WRL::ComPtr<IDXGIAdapter1> dxgiAdapter;
+        if ( FAILED( dxgiFactory->EnumAdapters1( adapterIndex, dxgiAdapter.ReleaseAndGetAddressOf() ) ) )
+            break;
+
+		DXGI_ADAPTER_DESC1 adapterDesc;
+        if ( FAILED( dxgiAdapter->GetDesc1( &adapterDesc ) ) )
+            continue;
+		if ( memcmp( &adapterDesc.AdapterLuid, &adapterId, sizeof( adapterId ) ) == 0 ) {
+			return adapterIndex;
+		}
+	}
+    return 0;
+}
+#endif
+
+
+#define FETCH_AND_DEFINE_XR_FUNCTION( instance, name ) \
+    PFN_ ## name name = nullptr; \
+    xrGetInstanceProcAddr( instance, #name, (PFN_xrVoidFunction *)&name );
 
 class HelloXrApp
 {
@@ -209,7 +241,16 @@ public:
 #if D3D11_SUPPORTED
             case RENDER_DEVICE_TYPE_D3D11:
             {
+                FETCH_AND_DEFINE_XR_FUNCTION( m_instance, xrGetD3D11GraphicsRequirementsKHR );
+                XrGraphicsRequirementsD3D11KHR graphicsRequirements = { XR_TYPE_GRAPHICS_REQUIREMENTS_D3D11_KHR };
+                XrResult res = xrGetD3D11GraphicsRequirementsKHR( m_instance, m_systemId, &graphicsRequirements );
+                if ( XR_FAILED( res ) )
+                {
+                    return false;
+                }
+
                 EngineD3D11CreateInfo EngineCI;
+                EngineCI.AdapterId = GetAdapterIndexFromLuid( graphicsRequirements.adapterLuid );
 #    if ENGINE_DLL
                 // Load the dll and import GetEngineFactoryD3D11() function
                 auto* GetEngineFactoryD3D11 = LoadGraphicsEngineD3D11();
@@ -226,11 +267,20 @@ public:
 #if D3D12_SUPPORTED
             case RENDER_DEVICE_TYPE_D3D12:
             {
+				FETCH_AND_DEFINE_XR_FUNCTION( m_instance, xrGetD3D12GraphicsRequirementsKHR );
+				XrGraphicsRequirementsD3D12KHR graphicsRequirements = { XR_TYPE_GRAPHICS_REQUIREMENTS_D3D12_KHR };
+				XrResult res = xrGetD3D12GraphicsRequirementsKHR( m_instance, m_systemId, &graphicsRequirements );
+				if ( XR_FAILED( res ) )
+				{
+					return false;
+				}
+
 #    if ENGINE_DLL
                 // Load the dll and import GetEngineFactoryD3D12() function
                 auto GetEngineFactoryD3D12 = LoadGraphicsEngineD3D12();
 #    endif
                 EngineD3D12CreateInfo EngineCI;
+				EngineCI.AdapterId = GetAdapterIndexFromLuid( graphicsRequirements.adapterLuid );
 
                 auto* pFactoryD3D12 = GetEngineFactoryD3D12();
                 pFactoryD3D12->CreateDeviceAndContextsD3D12(EngineCI, &m_pDevice, &m_pImmediateContext);
@@ -244,6 +294,15 @@ public:
 #if GL_SUPPORTED
             case RENDER_DEVICE_TYPE_GL:
             {
+				FETCH_AND_DEFINE_XR_FUNCTION( m_instance, xrGetOpenGLGraphicsRequirementsKHR );
+				// we don't have any way to specify the adapter in OpenGL, but we're required to get the graphics
+                // requirements anyway
+				XrGraphicsRequirementsOpenGLKHR graphicsRequirements = { XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR };
+				XrResult res = xrGetOpenGLGraphicsRequirementsKHR( m_instance, m_systemId, &graphicsRequirements );
+				if ( XR_FAILED( res ) )
+				{
+					return false;
+				}
 #    if EXPLICITLY_LOAD_ENGINE_GL_DLL
                 // Load the dll and import GetEngineFactoryOpenGL() function
                 auto GetEngineFactoryOpenGL = LoadGraphicsEngineOpenGL();
@@ -262,6 +321,8 @@ public:
 #if VULKAN_SUPPORTED
             case RENDER_DEVICE_TYPE_VULKAN:
             {
+                // TODO: Vulkan requires that the runtime create the instance. That's going to require a change to 
+                // CrateDeviceAndContextsVk, probably
 #    if EXPLICITLY_LOAD_ENGINE_VK_DLL
                 // Load the dll and import GetEngineFactoryVk() function
                 auto GetEngineFactoryVk = LoadGraphicsEngineVk();
@@ -359,6 +420,15 @@ public:
         createInfo.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
 
         XrResult res = xrCreateInstance( &createInfo, &m_instance );
+        if ( XR_FAILED( res ) )
+        {
+            return false;
+        }
+
+        XrSystemGetInfo getInfo = { XR_TYPE_SYSTEM_GET_INFO };
+        getInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
+        res = xrGetSystem( m_instance, &getInfo, &m_systemId );
+
         return XR_SUCCEEDED( res );
     }
 
@@ -534,6 +604,7 @@ private:
     RENDER_DEVICE_TYPE            m_DeviceType = RENDER_DEVICE_TYPE_D3D11;
 
     XrInstance m_instance;
+    XrSystemId m_systemId;
     XrSession m_session;
 };
 
