@@ -549,6 +549,81 @@ public:
 
         CHECK_XR_RESULT( xrCreateSwapchain( m_session, &scCreateInfo, &m_swapchain ) );
 
+        uint32_t imageCount;
+        CHECK_XR_RESULT( xrEnumerateSwapchainImages( m_swapchain, 0, &imageCount, nullptr ) );
+
+        std::vector< RefCntAutoPtr<ITexture> > textures;
+
+		switch ( m_DeviceType )
+		{
+#if D3D11_SUPPORTED
+		case RENDER_DEVICE_TYPE_D3D11:
+		{
+            std::vector< XrSwapchainImageD3D11KHR > images;
+            images.resize( imageCount, { XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR } );
+			CHECK_XR_RESULT( xrEnumerateSwapchainImages( m_swapchain, 
+                imageCount, &imageCount, (XrSwapchainImageBaseHeader *)&images[0] ) );
+
+            for ( const XrSwapchainImageD3D11KHR& image : images )
+            {
+                RefCntAutoPtr< ITexture > pTexture;
+                GetD3D11Device()->CreateTexture2DFromD3DResource( image.texture, RESOURCE_STATE_UNKNOWN, &pTexture );
+                textures.push_back( pTexture );
+            }
+		}
+		break;
+#endif
+
+
+#if D3D12_SUPPORTED
+		case RENDER_DEVICE_TYPE_D3D12:
+		{
+			requestedFormats.push_back( DXGI_FORMAT_R16G16B16A16_FLOAT );
+			requestedFormats.push_back( DXGI_FORMAT_R8G8B8A8_UNORM );
+
+			static XrGraphicsBindingD3D12KHR d3d12Binding = { XR_TYPE_GRAPHICS_BINDING_D3D12_KHR };
+			createInfo.next = &d3d12Binding;
+
+			d3d12Binding.device = GetD3D12Device()->GetD3D12Device();
+		}
+		break;
+#endif
+
+
+#if GL_SUPPORTED
+		case RENDER_DEVICE_TYPE_GL:
+		{
+		}
+		break;
+#endif
+
+
+#if VULKAN_SUPPORTED
+		case RENDER_DEVICE_TYPE_VULKAN:
+		{
+		}
+		break;
+#endif
+		}
+
+		for ( RefCntAutoPtr<ITexture> & pTexture: textures )
+		{
+			TextureViewDesc viewDesc;
+			viewDesc.ViewType = TEXTURE_VIEW_RENDER_TARGET;
+			viewDesc.FirstArraySlice = 0;
+			viewDesc.NumArraySlices = 1;
+			viewDesc.AccessFlags = UAV_ACCESS_FLAG_WRITE;
+
+			RefCntAutoPtr< ITextureView > pLeftEyeView;
+			pTexture->CreateView( viewDesc, &pLeftEyeView );
+			m_rpEyeSwapchainViews[ 0 ].push_back( pLeftEyeView );
+
+			viewDesc.FirstArraySlice = 1;
+			RefCntAutoPtr< ITextureView > pRightEyeView;
+			pTexture->CreateView( viewDesc, &pRightEyeView );
+			m_rpEyeSwapchainViews[ 1 ].push_back( pRightEyeView );
+		}
+
         return true;
 
     }
@@ -729,6 +804,7 @@ private:
     RefCntAutoPtr<IRenderDevice>  m_pDevice;
     RefCntAutoPtr<IDeviceContext> m_pImmediateContext;
     RefCntAutoPtr<ISwapChain>     m_pSwapChain;
+	std::vector< RefCntAutoPtr<ITextureView> >  m_rpEyeSwapchainViews[2];
     RefCntAutoPtr<IPipelineState> m_pPSO;
     RENDER_DEVICE_TYPE            m_DeviceType = RENDER_DEVICE_TYPE_D3D11;
 
