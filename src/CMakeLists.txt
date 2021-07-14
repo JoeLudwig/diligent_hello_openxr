@@ -19,7 +19,24 @@ PRIVATE
     Diligent-GraphicsEngineOpenGL-shared
     Diligent-GraphicsEngineD3D12-shared
 #    Diligent-GraphicsEngineVk-shared
+    Diligent-Win32Platform
+    Diligent-Common
     openxr_loader
     DXGI
 )
+
+if(PLATFORM_WIN32 OR PLATFORM_LINUX)
+    # Copy assets to target folder
+    add_custom_command(TARGET HelloDiligentXr POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+            "\"$<TARGET_FILE_DIR:HelloDiligentXr>\"")
+endif()
+
+if( PLATFORM_WIN32 )
+    set_target_properties(HelloDiligentXr PROPERTIES 
+        VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+    )
+endif()
+
 copy_required_dlls(HelloDiligentXr)
