@@ -112,56 +112,14 @@
 
 using namespace Diligent;
 
-// For this tutorial, we will use simple vertex shader
-// that creates a procedural triangle
-
-// Diligent Engine can use HLSL source on all supported platforms.
-// It will convert HLSL to GLSL in OpenGL mode, while Vulkan backend will compile it directly to SPIRV.
-
-static const char* VSSource = R"(
-struct PSInput 
-{ 
-    float4 Pos   : SV_POSITION; 
-    float3 Color : COLOR; 
-};
-
-void main(in  uint    VertId : SV_VertexID,
-          out PSInput PSIn) 
+XrPosef IdentityXrPose()
 {
-    float4 Pos[3];
-    Pos[0] = float4(-0.5, -0.5, 0.0, 1.0);
-    Pos[1] = float4( 0.0, +0.5, 0.0, 1.0);
-    Pos[2] = float4(+0.5, -0.5, 0.0, 1.0);
-
-    float3 Col[3];
-    Col[0] = float3(1.0, 0.0, 0.0); // red
-    Col[1] = float3(0.0, 1.0, 0.0); // green
-    Col[2] = float3(0.0, 0.0, 1.0); // blue
-
-    PSIn.Pos   = Pos[VertId];
-    PSIn.Color = Col[VertId];
+    XrPosef pose;
+    pose.orientation = { 0, 0, 0, 1.f };
+	pose.position = { 0, 0, 0 };
+    return pose;
 }
-)";
 
-// Pixel shader simply outputs interpolated vertex color
-static const char* PSSource = R"(
-struct PSInput 
-{ 
-    float4 Pos   : SV_POSITION; 
-    float3 Color : COLOR; 
-};
-
-struct PSOutput
-{ 
-    float4 Color : SV_TARGET; 
-};
-
-void main(in  PSInput  PSIn,
-          out PSOutput PSOut)
-{
-    PSOut.Color = float4(PSIn.Color.rgb, 1.0);
-}
-)";
 
 typedef std::map< std::string, uint32_t > XrExtensionMap;
 
@@ -480,6 +438,7 @@ public:
         createInfo.createFlags = 0;
 
         std::vector< int64_t > requestedFormats;
+		std::vector< int64_t > requestedDepthFormats;
         switch ( m_DeviceType )
         {
 #if D3D11_SUPPORTED
@@ -487,6 +446,8 @@ public:
 		{
             requestedFormats.push_back( DXGI_FORMAT_R16G16B16A16_FLOAT );
 			requestedFormats.push_back( DXGI_FORMAT_R8G8B8A8_UNORM );
+			requestedDepthFormats.push_back( DXGI_FORMAT_D32_FLOAT );
+            requestedDepthFormats.push_back( DXGI_FORMAT_D16_UNORM );
 
             static XrGraphicsBindingD3D11KHR d3d11Binding = { XR_TYPE_GRAPHICS_BINDING_D3D11_KHR };
             createInfo.next = &d3d11Binding;
@@ -502,6 +463,8 @@ public:
 		{
 			requestedFormats.push_back( DXGI_FORMAT_R16G16B16A16_FLOAT );
 			requestedFormats.push_back( DXGI_FORMAT_R8G8B8A8_UNORM );
+			requestedDepthFormats.push_back( DXGI_FORMAT_D32_FLOAT );
+			requestedDepthFormats.push_back( DXGI_FORMAT_D16_UNORM );
 
 			static XrGraphicsBindingD3D12KHR d3d12Binding = { XR_TYPE_GRAPHICS_BINDING_D3D12_KHR };
 			createInfo.next = &d3d12Binding;
@@ -538,15 +501,26 @@ public:
         if ( requestedFormats.empty() || supportedFormats.empty() )
             return false;
 
-        XrSwapchainCreateInfo scCreateInfo = { XR_TYPE_SWAPCHAIN_CREATE_INFO };
-        scCreateInfo.arraySize = 2;
-        scCreateInfo.width = m_views[ 0 ].recommendedImageRectWidth;
+		XrSwapchainCreateInfo scCreateInfo = { XR_TYPE_SWAPCHAIN_CREATE_INFO };
+		scCreateInfo.arraySize = 2;
+		scCreateInfo.width = m_views[ 0 ].recommendedImageRectWidth;
 		scCreateInfo.height = m_views[ 0 ].recommendedImageRectHeight;
-        scCreateInfo.createFlags = 0;
-        scCreateInfo.format = supportedFormats[ 0 ];
-        scCreateInfo.mipCount = 1;
-        scCreateInfo.sampleCount = 1;
-        scCreateInfo.faceCount = 1;
+		scCreateInfo.createFlags = 0;
+		scCreateInfo.format = supportedFormats[ 0 ];
+		scCreateInfo.mipCount = 1;
+		scCreateInfo.sampleCount = 1;
+		scCreateInfo.faceCount = 1;
+
+		XrSwapchainCreateInfo depthCreateInfo = { XR_TYPE_SWAPCHAIN_CREATE_INFO };
+		depthCreateInfo.arraySize = 2;
+		depthCreateInfo.width = m_views[ 0 ].recommendedImageRectWidth;
+		depthCreateInfo.height = m_views[ 0 ].recommendedImageRectHeight;
+		depthCreateInfo.createFlags = 0;
+        depthCreateInfo.usageFlags = XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+		depthCreateInfo.format = requestedDepthFormats[ 0 ];
+		depthCreateInfo.mipCount = 1;
+		depthCreateInfo.sampleCount = 1;
+		depthCreateInfo.faceCount = 1;
 
         // find the format on our list that's earliest on the runtime's list
         for ( int64_t supported : supportedFormats )
@@ -558,13 +532,25 @@ public:
                 break;
             }
         }
+		for ( int64_t supported : supportedFormats )
+		{
+			if ( std::find( requestedDepthFormats.begin(), requestedDepthFormats.end(), supported )
+				!= requestedDepthFormats.end() )
+			{
+				depthCreateInfo.format = supported;
+				break;
+			}
+		}
 
         CHECK_XR_RESULT( xrCreateSwapchain( m_session, &scCreateInfo, &m_swapchain ) );
+		CHECK_XR_RESULT( xrCreateSwapchain( m_session, &depthCreateInfo, &m_depthSwapchain ) );
 
-        uint32_t imageCount;
+        uint32_t imageCount, depthImageCount;
         CHECK_XR_RESULT( xrEnumerateSwapchainImages( m_swapchain, 0, &imageCount, nullptr ) );
+		CHECK_XR_RESULT( xrEnumerateSwapchainImages( m_depthSwapchain, 0, &depthImageCount, nullptr ) );
 
         std::vector< RefCntAutoPtr<ITexture> > textures;
+		std::vector< RefCntAutoPtr<ITexture> > depthTextures;
 
 		switch ( m_DeviceType )
 		{
@@ -582,6 +568,18 @@ public:
                 GetD3D11Device()->CreateTexture2DFromD3DResource( image.texture, RESOURCE_STATE_UNKNOWN, &pTexture );
                 textures.push_back( pTexture );
             }
+
+			std::vector< XrSwapchainImageD3D11KHR > depthImages;
+            depthImages.resize( depthImageCount, { XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR } );
+			CHECK_XR_RESULT( xrEnumerateSwapchainImages( m_depthSwapchain,
+                depthImageCount, &depthImageCount, (XrSwapchainImageBaseHeader*)&depthImages[ 0 ] ) );
+
+			for ( const XrSwapchainImageD3D11KHR& image : depthImages )
+			{
+				RefCntAutoPtr< ITexture > pTexture;
+				GetD3D11Device()->CreateTexture2DFromD3DResource( image.texture, RESOURCE_STATE_UNKNOWN, &pTexture );
+                depthTextures.push_back( pTexture );
+			}
 		}
 		break;
 #endif
@@ -636,8 +634,30 @@ public:
 			m_rpEyeSwapchainViews[ 1 ].push_back( pRightEyeView );
 		}
 
-        return true;
+		for ( RefCntAutoPtr<ITexture> & pTexture: depthTextures )
+		{
+			TextureViewDesc viewDesc;
+			viewDesc.ViewType = TEXTURE_VIEW_DEPTH_STENCIL;
+			viewDesc.FirstArraySlice = 0;
+			viewDesc.NumArraySlices = 1;
+			viewDesc.AccessFlags = UAV_ACCESS_FLAG_WRITE;
 
+			RefCntAutoPtr< ITextureView > pLeftEyeView;
+			pTexture->CreateView( viewDesc, &pLeftEyeView );
+			m_rpEyeDepthViews[ 0 ].push_back( pLeftEyeView );
+
+			viewDesc.FirstArraySlice = 1;
+			RefCntAutoPtr< ITextureView > pRightEyeView;
+			pTexture->CreateView( viewDesc, &pRightEyeView );
+            m_rpEyeDepthViews[ 1 ].push_back( pRightEyeView );
+		}
+
+		XrReferenceSpaceCreateInfo spaceCreateInfo = { XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
+		spaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
+        spaceCreateInfo.poseInReferenceSpace = IdentityXrPose();
+		CHECK_XR_RESULT( xrCreateReferenceSpace( m_session, &spaceCreateInfo, &m_stageSpace ) );
+
+        return true;
     }
 
 
@@ -734,6 +754,23 @@ public:
 	void CreateVertexBuffer();
 	void CreateIndexBuffer();
 
+    void ProcessOpenXrEvents();
+    bool ShouldRender() const 
+    { 
+        return m_sessionState == XR_SESSION_STATE_VISIBLE
+            || m_sessionState == XR_SESSION_STATE_FOCUSED;
+    }
+	bool ShouldWait() const
+	{
+		return m_sessionState == XR_SESSION_STATE_READY
+            || m_sessionState == XR_SESSION_STATE_SYNCHRONIZED
+            || m_sessionState == XR_SESSION_STATE_VISIBLE
+			|| m_sessionState == XR_SESSION_STATE_FOCUSED;
+	}
+
+    bool RunXrFrame();
+    bool RenderEye( const XrView& view, ITextureView *eyeBuffer, ITextureView* depthBuffer );
+
 private:
 	RefCntAutoPtr<IPipelineState>         m_pPSO;
 	RefCntAutoPtr<IShaderResourceBinding> m_pSRB;
@@ -747,6 +784,7 @@ private:
     RefCntAutoPtr<IDeviceContext> m_pImmediateContext;
     RefCntAutoPtr<ISwapChain>     m_pSwapChain;
 	std::vector< RefCntAutoPtr<ITextureView> >  m_rpEyeSwapchainViews[2];
+	std::vector< RefCntAutoPtr<ITextureView> >  m_rpEyeDepthViews[ 2 ];
     RENDER_DEVICE_TYPE            m_DeviceType = RENDER_DEVICE_TYPE_D3D11;
 
     XrInstance m_instance;
@@ -754,7 +792,181 @@ private:
     XrSession m_session;
     XrViewConfigurationView m_views[ 2 ] = {};
     XrSwapchain m_swapchain = XR_NULL_HANDLE;
+	XrSwapchain m_depthSwapchain = XR_NULL_HANDLE;
+    XrSpace m_stageSpace = XR_NULL_HANDLE;
+    XrSessionState m_sessionState = XR_SESSION_STATE_UNKNOWN;
 };
+
+void HelloXrApp::ProcessOpenXrEvents()
+{
+    while ( true )
+    {
+        XrEventDataBuffer eventData = { XR_TYPE_EVENT_DATA_BUFFER };
+        XrResult res = xrPollEvent( m_instance, &eventData );
+        if ( res == XR_EVENT_UNAVAILABLE )
+            break;
+
+        if ( XR_FAILED( res ) )
+        {
+            // log something?
+            break;
+        }
+
+        switch ( eventData.type )
+        {
+            case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED:
+            {
+                const XrEventDataSessionStateChanged* event = ( const XrEventDataSessionStateChanged* )( &eventData );
+                switch ( event->state )
+                {
+                    case XR_SESSION_STATE_READY:
+                    {
+                        XrSessionBeginInfo beginInfo = { XR_TYPE_SESSION_BEGIN_INFO };
+                        beginInfo.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+                        xrBeginSession( m_session, &beginInfo );
+                    }
+                    break;
+
+					case XR_SESSION_STATE_STOPPING:
+					{
+						xrEndSession( m_session );
+					}
+					break;
+
+                    default:
+                        // nothing special to do for this session state
+                        break;
+                }
+
+                m_sessionState = event->state;
+            }
+            break;
+
+            default:
+                // ignoring this event
+                break;
+        }
+    }
+}
+
+bool HelloXrApp::RunXrFrame()
+{
+	ProcessOpenXrEvents();
+
+    if ( !ShouldWait() )
+        return true;
+
+    XrFrameState frameState = { XR_TYPE_FRAME_STATE };
+    XrFrameWaitInfo waitInfo = { XR_TYPE_FRAME_WAIT_INFO };
+    CHECK_XR_RESULT( xrWaitFrame( m_session, &waitInfo, &frameState ) );
+
+    XrFrameBeginInfo beginInfo = { XR_TYPE_FRAME_BEGIN_INFO };
+    CHECK_XR_RESULT( xrBeginFrame( m_session, &beginInfo ) );
+
+	XrFrameEndInfo frameEndInfo = { XR_TYPE_FRAME_END_INFO };
+	frameEndInfo.displayTime = frameState.predictedDisplayTime;
+	frameEndInfo.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+
+	XrCompositionLayerProjectionView projectionViews[ 2 ] = { { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW }, { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW } };
+    XrCompositionLayerProjection projectionLayer = { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
+    XrCompositionLayerBaseHeader *layers[] = { (XrCompositionLayerBaseHeader*) &projectionLayer };
+
+    if ( frameState.shouldRender && ShouldRender() )
+    {
+		// acquire the image index for this swapchain
+		XrSwapchainImageAcquireInfo acquireInfo = { XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
+		uint32_t index;
+		CHECK_XR_RESULT( xrAcquireSwapchainImage( m_swapchain, &acquireInfo, &index ) );
+
+		// wait for swap chains
+		XrSwapchainImageWaitInfo waitInfo = { XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
+		waitInfo.timeout = 999999;
+		CHECK_XR_RESULT( xrWaitSwapchainImage( m_swapchain, &waitInfo ) );
+
+		XrViewLocateInfo locateInfo = { XR_TYPE_VIEW_LOCATE_INFO };
+		locateInfo.displayTime = frameState.predictedDisplayTime;
+		locateInfo.space = m_stageSpace;
+		locateInfo.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+
+		XrViewState viewState = { XR_TYPE_VIEW_STATE };
+		XrView views[ 2 ] = { { XR_TYPE_VIEW }, { XR_TYPE_VIEW } };
+		uint32_t viewCount;
+		CHECK_XR_RESULT( xrLocateViews( m_session, &locateInfo, &viewState, 2, &viewCount, views ) );
+
+		// render
+		RenderEye( views[ 0 ], m_rpEyeSwapchainViews[ 0 ][ index ], m_rpEyeDepthViews[ 0 ][ index ] );
+		RenderEye( views[ 1 ], m_rpEyeSwapchainViews[ 1 ][ index ], m_rpEyeDepthViews[ 1 ][ index ] );
+
+        // release the image we just rendered into
+        XrSwapchainImageReleaseInfo releaseInfo = { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
+        CHECK_XR_RESULT( xrReleaseSwapchainImage( m_swapchain, &releaseInfo ) );
+
+        for ( uint32_t i = 0; i < 2; i++ )
+        {
+            projectionViews[ i ].fov = views[ i ].fov;
+			projectionViews[ i ].pose = views[ i ].pose;
+            projectionViews[ i ].subImage.swapchain = m_swapchain;
+			projectionViews[ i ].subImage.imageArrayIndex = i;
+            projectionViews[ i ].subImage.imageRect =
+                { 
+                    { 0, 0 }, 
+                    { 
+                        (int32_t)m_views[ 0 ].recommendedImageRectWidth, 
+                        (int32_t)m_views[ 0 ].recommendedImageRectHeight 
+                    } 
+                };
+        }
+
+        projectionLayer.space = m_stageSpace;
+        projectionLayer.viewCount = 2;
+        projectionLayer.views = projectionViews;
+
+        frameEndInfo.layers = layers;
+        frameEndInfo.layerCount = 1;
+    }
+
+    CHECK_XR_RESULT( xrEndFrame( m_session, &frameEndInfo ) );
+
+    return true;
+}
+
+
+bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextureView* depthBuffer )
+{
+	// Clear the back buffer
+	const float ClearColor[] = { 1.f, 0.350f, 0.350f, 1.0f };
+	m_pImmediateContext->SetRenderTargets( 1, &eyeBuffer, depthBuffer, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+	m_pImmediateContext->ClearRenderTarget( eyeBuffer, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+	m_pImmediateContext->ClearDepthStencil( depthBuffer, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+
+	{
+		// Map the buffer and write current world-view-projection matrix
+		MapHelper<float4x4> CBConstants( m_pImmediateContext, m_VSConstants, MAP_WRITE, MAP_FLAG_DISCARD );
+		*CBConstants = m_WorldViewProjMatrix.Transpose();
+	}
+
+	// Bind vertex and index buffers
+	Uint32   offset = 0;
+	IBuffer* pBuffs[] = { m_CubeVertexBuffer };
+	m_pImmediateContext->SetVertexBuffers( 0, 1, pBuffs, &offset, RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET );
+	m_pImmediateContext->SetIndexBuffer( m_CubeIndexBuffer, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+
+	// Set the pipeline state
+	m_pImmediateContext->SetPipelineState( m_pPSO );
+	// Commit shader resources. RESOURCE_STATE_TRANSITION_MODE_TRANSITION mode
+	// makes sure that resources are transitioned to required states.
+	m_pImmediateContext->CommitShaderResources( m_pSRB, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+
+	DrawIndexedAttribs DrawAttrs;     // This is an indexed draw call
+	DrawAttrs.IndexType = VT_UINT32; // Index type
+	DrawAttrs.NumIndices = 36;
+	// Verify the state of vertex and index buffers
+	DrawAttrs.Flags = DRAW_FLAG_VERIFY_ALL;
+	m_pImmediateContext->DrawIndexed( DrawAttrs );
+
+    return true;
+}
+
 
 void HelloXrApp::CreatePipelineState()
 {
@@ -1054,7 +1266,9 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int cmdShow)
         }
         else
         {
-			auto CurrTime = Timer.GetElapsedTime();
+            g_pTheApp->RunXrFrame();
+
+            auto CurrTime = Timer.GetElapsedTime();
 			auto ElapsedTime = CurrTime - PrevTime;
 			PrevTime = CurrTime;
             g_pTheApp->Update( CurrTime, ElapsedTime );
