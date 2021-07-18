@@ -778,7 +778,8 @@ private:
 	RefCntAutoPtr<IBuffer>                m_CubeVertexBuffer;
 	RefCntAutoPtr<IBuffer>                m_CubeIndexBuffer;
 	RefCntAutoPtr<IBuffer>                m_VSConstants;
-	float4x4                              m_WorldViewProjMatrix;
+	float4x4                              m_CubeToWorld;
+	float4x4                              m_ViewToProj;
 	RefCntAutoPtr<IEngineFactory>         m_pEngineFactory;
 
     RefCntAutoPtr<IRenderDevice>  m_pDevice;
@@ -943,16 +944,16 @@ bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextu
     float4x4 eyeToProj;
     float4x4_CreateProjection( &eyeToProj, m_DeviceType, view.fov, 0.01f, 10.f );
 
+    m_ViewToProj = eyeToProj;
+
     float4x4 eyeToStage = 
         quaternionFromXrQuaternion( view.pose.orientation ).ToMatrix() * float4x4::Translation( vectorFromXrVector( view.pose.position ) );
     float4x4 stageToEye = eyeToStage.Inverse();
 
-    float4x4 flipZ = float4x4::Scale( 1.f, 1.f, -1.f );
-
 	{
 		// Map the buffer and write current world-view-projection matrix
 		MapHelper<float4x4> CBConstants( m_pImmediateContext, m_VSConstants, MAP_WRITE, MAP_FLAG_DISCARD );
-		*CBConstants = ( float4x4::Scale( 0.5f ) * stageToEye * eyeToProj ).Transpose();
+		*CBConstants = ( m_CubeToWorld * stageToEye * eyeToProj ).Transpose();
 	}
 
 	// Bind vertex and index buffers
@@ -1001,7 +1002,8 @@ void HelloXrApp::CreatePipelineState()
 	// Primitive topology defines what kind of primitives will be rendered by this pipeline state
 	PSOCreateInfo.GraphicsPipeline.PrimitiveTopology = PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	// Cull back faces
-	PSOCreateInfo.GraphicsPipeline.RasterizerDesc.CullMode = CULL_MODE_FRONT;
+	PSOCreateInfo.GraphicsPipeline.RasterizerDesc.CullMode = CULL_MODE_BACK;
+    PSOCreateInfo.GraphicsPipeline.RasterizerDesc.FrontCounterClockwise = true;
 	// Enable depth testing
 	PSOCreateInfo.GraphicsPipeline.DepthStencilDesc.DepthEnable = True;
 	// clang-format on
@@ -1167,10 +1169,11 @@ void HelloXrApp::Render()
 	m_pImmediateContext->ClearRenderTarget( pRTV, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 	m_pImmediateContext->ClearDepthStencil( pDSV, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 
+    float4x4 stageToDesktopView = float4x4::Translation( 0.f, 0.0f, -2.5f );
 	{
 		// Map the buffer and write current world-view-projection matrix
 		MapHelper<float4x4> CBConstants( m_pImmediateContext, m_VSConstants, MAP_WRITE, MAP_FLAG_DISCARD );
-		*CBConstants = m_WorldViewProjMatrix.Transpose();
+		*CBConstants = ( m_CubeToWorld * stageToDesktopView * m_ViewToProj ).Transpose();
 	}
 
 	// Bind vertex and index buffers
@@ -1197,19 +1200,9 @@ void HelloXrApp::Render()
 void HelloXrApp::Update( double CurrTime, double ElapsedTime )
 {
 	// Apply rotation
-	float4x4 CubeModelTransform = float4x4::RotationY( static_cast<float>( CurrTime ) * 1.0f ) * float4x4::RotationX( -PI_F * 0.1f );
-
-	// Camera is at (0, 0, -5) looking along the Z axis
-	float4x4 View = float4x4::Translation( 0.f, 0.0f, 5.0f );
-
-	// Get pretransform matrix that rotates the scene according the surface orientation
-    auto SrfPreTransform = float4x4::Identity(); // GetSurfacePretransformMatrix( float3 { 0, 0, 1 } );
-
-	// Get projection matrix adjusted to the current screen orientation
-    auto Proj = float4x4::Projection( 90, 16.f / 9.f, 0.01f, 10.f, false );
-
-	// Compute world-view-projection matrix
-	m_WorldViewProjMatrix = CubeModelTransform * View * SrfPreTransform * Proj;
+    m_CubeToWorld = float4x4::Scale( 0.5f ) 
+        * float4x4::RotationY( static_cast<float>( CurrTime ) * 1.0f ) 
+        * float4x4::RotationX( -PI_F * 0.1f );
 }
 
 
