@@ -101,7 +101,8 @@
 #include <vulkan/vulkan.h>
 #endif
 
-#include "openxr/openxr_platform.h"
+#include <openxr/openxr_platform.h>
+#include "graphics_utilities.h"
 
 #define CHECK_XR_RESULT( res ) \
     do { \
@@ -939,10 +940,19 @@ bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextu
 	m_pImmediateContext->ClearRenderTarget( eyeBuffer, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 	m_pImmediateContext->ClearDepthStencil( depthBuffer, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 
+    float4x4 eyeToProj;
+    float4x4_CreateProjection( &eyeToProj, m_DeviceType, view.fov, 0.01f, 10.f );
+
+    float4x4 eyeToStage = 
+        quaternionFromXrQuaternion( view.pose.orientation ).ToMatrix() * float4x4::Translation( vectorFromXrVector( view.pose.position ) );
+    float4x4 stageToEye = eyeToStage.Inverse();
+
+    float4x4 flipZ = float4x4::Scale( 1.f, 1.f, -1.f );
+
 	{
 		// Map the buffer and write current world-view-projection matrix
 		MapHelper<float4x4> CBConstants( m_pImmediateContext, m_VSConstants, MAP_WRITE, MAP_FLAG_DISCARD );
-		*CBConstants = m_WorldViewProjMatrix.Transpose();
+		*CBConstants = ( float4x4::Scale( 0.5f ) * stageToEye * eyeToProj ).Transpose();
 	}
 
 	// Bind vertex and index buffers
@@ -991,7 +1001,7 @@ void HelloXrApp::CreatePipelineState()
 	// Primitive topology defines what kind of primitives will be rendered by this pipeline state
 	PSOCreateInfo.GraphicsPipeline.PrimitiveTopology = PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	// Cull back faces
-	PSOCreateInfo.GraphicsPipeline.RasterizerDesc.CullMode = CULL_MODE_BACK;
+	PSOCreateInfo.GraphicsPipeline.RasterizerDesc.CullMode = CULL_MODE_FRONT;
 	// Enable depth testing
 	PSOCreateInfo.GraphicsPipeline.DepthStencilDesc.DepthEnable = True;
 	// clang-format on

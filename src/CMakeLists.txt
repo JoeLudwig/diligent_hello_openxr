@@ -1,6 +1,11 @@
 cmake_minimum_required (VERSION 3.6)
 
-add_executable(HelloDiligentXr WIN32 helloxr.cpp)
+add_executable(HelloDiligentXr 
+    WIN32 
+        helloxr.cpp
+        graphics_utilities.h
+)
+
 target_compile_options(HelloDiligentXr PRIVATE -DUNICODE -DENGINE_DLL)
 target_include_directories(HelloDiligentXr 
 PRIVATE 
