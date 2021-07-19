@@ -4,6 +4,10 @@ add_executable(HelloDiligentXr
     WIN32 
         helloxr.cpp
         graphics_utilities.h
+        igraphicsbinding.cpp
+        igraphicsbinding.h
+        graphicsbinding_d3d11.cpp
+        graphicsbinding_d3d11.h
 )
 
 target_compile_options(HelloDiligentXr PRIVATE -DUNICODE -DENGINE_DLL)

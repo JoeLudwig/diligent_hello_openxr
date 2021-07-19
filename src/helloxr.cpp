@@ -62,6 +62,8 @@
 #    define VULKAN_SUPPORTED 1
 #endif
 
+#include <Graphics/GraphicsEngine/interface/EngineFactory.h>
+
 #include "Graphics/GraphicsEngineD3D11/interface/EngineFactoryD3D11.h"
 #include "Graphics/GraphicsEngineD3D12/interface/EngineFactoryD3D12.h"
 #include "Graphics/GraphicsEngineOpenGL/interface/EngineFactoryOpenGL.h"
@@ -103,6 +105,7 @@
 
 #include <openxr/openxr_platform.h>
 #include "graphics_utilities.h"
+#include "igraphicsbinding.h"
 
 #define CHECK_XR_RESULT( res ) \
     do { \
@@ -154,39 +157,6 @@ XrExtensionMap GetAvailableOpenXRExtensions()
     return res;
 }
 
-#if D3D11_SUPPORTED || D3D12_SUPPORTED
-#include <wrl/client.h>
-
-UINT GetAdapterIndexFromLuid( LUID adapterId ) 
-{
-	// Create the DXGI factory.
-    Microsoft::WRL::ComPtr<IDXGIFactory1> dxgiFactory;
-    if ( FAILED( CreateDXGIFactory1( __uuidof( IDXGIFactory1 ), reinterpret_cast<void**>( dxgiFactory.ReleaseAndGetAddressOf() ) ) ) )
-        return 0;
-
-	for ( UINT adapterIndex = 0;; adapterIndex++ ) 
-    {
-		// EnumAdapters1 will fail with DXGI_ERROR_NOT_FOUND when there are no more adapters to enumerate.
-        Microsoft::WRL::ComPtr<IDXGIAdapter1> dxgiAdapter;
-        if ( FAILED( dxgiFactory->EnumAdapters1( adapterIndex, dxgiAdapter.ReleaseAndGetAddressOf() ) ) )
-            break;
-
-		DXGI_ADAPTER_DESC1 adapterDesc;
-        if ( FAILED( dxgiAdapter->GetDesc1( &adapterDesc ) ) )
-            continue;
-		if ( memcmp( &adapterDesc.AdapterLuid, &adapterId, sizeof( adapterId ) ) == 0 ) {
-			return adapterIndex;
-		}
-	}
-    return 0;
-}
-#endif
-
-
-#define FETCH_AND_DEFINE_XR_FUNCTION( instance, name ) \
-    PFN_ ## name name = nullptr; \
-    xrGetInstanceProcAddr( instance, #name, (PFN_xrVoidFunction *)&name );
-
 class HelloXrApp
 {
 public:
@@ -196,7 +166,7 @@ public:
 
     ~HelloXrApp()
     {
-        m_pImmediateContext->Flush();
+        m_pGraphicsBinding->GetImmediateContext()->Flush();
     }
 
     bool Initialize(HWND hWnd)
@@ -206,118 +176,110 @@ public:
         {
             return false;
         }
+        m_pGraphicsBinding = IGraphicsBinding::CreateBindingForDeviceType( m_DeviceType, m_instance, m_systemId );
+        if ( !m_pGraphicsBinding )
+        {
+            return false;
+        }
 
+ 	    Win32NativeWindow Window { hWnd };
         SwapChainDesc SCDesc;
         switch (m_DeviceType)
         {
 #if D3D11_SUPPORTED
             case RENDER_DEVICE_TYPE_D3D11:
             {
-                FETCH_AND_DEFINE_XR_FUNCTION( m_instance, xrGetD3D11GraphicsRequirementsKHR );
-                XrGraphicsRequirementsD3D11KHR graphicsRequirements = { XR_TYPE_GRAPHICS_REQUIREMENTS_D3D11_KHR };
-                XrResult res = xrGetD3D11GraphicsRequirementsKHR( m_instance, m_systemId, &graphicsRequirements );
-                if ( XR_FAILED( res ) )
-                {
-                    return false;
-                }
-
-                EngineD3D11CreateInfo EngineCI;
-                EngineCI.AdapterId = GetAdapterIndexFromLuid( graphicsRequirements.adapterLuid );
-                EngineCI.GraphicsAPIVersion = Version { 11, 0 };
 #    if ENGINE_DLL
-                // Load the dll and import GetEngineFactoryD3D11() function
-                auto* GetEngineFactoryD3D11 = LoadGraphicsEngineD3D11();
+				// Load the dll and import GetEngineFactoryD3D11() function
+				auto* GetEngineFactoryD3D11 = LoadGraphicsEngineD3D11();
 #    endif
-                auto* pFactoryD3D11 = GetEngineFactoryD3D11();
-                m_pEngineFactory = pFactoryD3D11;
-                pFactoryD3D11->CreateDeviceAndContextsD3D11(EngineCI, &m_pDevice, &m_pImmediateContext);
-                Win32NativeWindow Window{hWnd};
-                pFactoryD3D11->CreateSwapChainD3D11(m_pDevice, m_pImmediateContext, SCDesc, FullScreenModeDesc{}, Window, &m_pSwapChain);
+				auto* pFactoryD3D11 = GetEngineFactoryD3D11();
+				pFactoryD3D11->CreateSwapChainD3D11( m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), SCDesc, FullScreenModeDesc {}, Window, &m_pSwapChain );
             }
             break;
 #endif
 
-
-#if D3D12_SUPPORTED
-            case RENDER_DEVICE_TYPE_D3D12:
-            {
-				FETCH_AND_DEFINE_XR_FUNCTION( m_instance, xrGetD3D12GraphicsRequirementsKHR );
-				XrGraphicsRequirementsD3D12KHR graphicsRequirements = { XR_TYPE_GRAPHICS_REQUIREMENTS_D3D12_KHR };
-				XrResult res = xrGetD3D12GraphicsRequirementsKHR( m_instance, m_systemId, &graphicsRequirements );
-				if ( XR_FAILED( res ) )
-				{
-					return false;
-				}
-
-#    if ENGINE_DLL
-                // Load the dll and import GetEngineFactoryD3D12() function
-                auto GetEngineFactoryD3D12 = LoadGraphicsEngineD3D12();
-#    endif
-                EngineD3D12CreateInfo EngineCI;
-				EngineCI.AdapterId = GetAdapterIndexFromLuid( graphicsRequirements.adapterLuid );
-				EngineCI.GraphicsAPIVersion = Version { 12, 0 };
-
-                auto* pFactoryD3D12 = GetEngineFactoryD3D12();
-				m_pEngineFactory = pFactoryD3D12;
-                pFactoryD3D12->CreateDeviceAndContextsD3D12(EngineCI, &m_pDevice, &m_pImmediateContext);
-                Win32NativeWindow Window{hWnd};
-                pFactoryD3D12->CreateSwapChainD3D12(m_pDevice, m_pImmediateContext, SCDesc, FullScreenModeDesc{}, Window, &m_pSwapChain);
-            }
-            break;
-#endif
-
-
-#if GL_SUPPORTED
-            case RENDER_DEVICE_TYPE_GL:
-            {
-				FETCH_AND_DEFINE_XR_FUNCTION( m_instance, xrGetOpenGLGraphicsRequirementsKHR );
-				// we don't have any way to specify the adapter in OpenGL, but we're required to get the graphics
-                // requirements anyway
-				XrGraphicsRequirementsOpenGLKHR graphicsRequirements = { XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR };
-				XrResult res = xrGetOpenGLGraphicsRequirementsKHR( m_instance, m_systemId, &graphicsRequirements );
-				if ( XR_FAILED( res ) )
-				{
-					return false;
-				}
-#    if EXPLICITLY_LOAD_ENGINE_GL_DLL
-                // Load the dll and import GetEngineFactoryOpenGL() function
-                auto GetEngineFactoryOpenGL = LoadGraphicsEngineOpenGL();
-#    endif
-                auto* pFactoryOpenGL = GetEngineFactoryOpenGL();
-				m_pEngineFactory = pFactoryOpenGL;
-
-                EngineGLCreateInfo EngineCI;
-                EngineCI.Window.hWnd = hWnd;
-
-                pFactoryOpenGL->CreateDeviceAndSwapChainGL(EngineCI, &m_pDevice, &m_pImmediateContext, SCDesc, &m_pSwapChain);
-            }
-            break;
-#endif
-
-
-#if VULKAN_SUPPORTED
-            case RENDER_DEVICE_TYPE_VULKAN:
-            {
-                // TODO: Vulkan requires that the runtime create the instance. That's going to require a change to 
-                // CrateDeviceAndContextsVk, probably
-#    if EXPLICITLY_LOAD_ENGINE_VK_DLL
-                // Load the dll and import GetEngineFactoryVk() function
-                auto GetEngineFactoryVk = LoadGraphicsEngineVk();
-#    endif
-                EngineVkCreateInfo EngineCI;
-
-                auto* pFactoryVk = GetEngineFactoryVk();
-				m_pEngineFactory = pFactoryVk;
-                pFactoryVk->CreateDeviceAndContextsVk(EngineCI, &m_pDevice, &m_pImmediateContext);
-
-                if (!m_pSwapChain && hWnd != nullptr)
-                {
-                    Win32NativeWindow Window{hWnd};
-                    pFactoryVk->CreateSwapChainVk(m_pDevice, m_pImmediateContext, SCDesc, Window, &m_pSwapChain);
-                }
-            }
-            break;
-#endif
+//
+//#if D3D12_SUPPORTED
+//            case RENDER_DEVICE_TYPE_D3D12:
+//            {
+//				FETCH_AND_DEFINE_XR_FUNCTION( m_instance, xrGetD3D12GraphicsRequirementsKHR );
+//				XrGraphicsRequirementsD3D12KHR graphicsRequirements = { XR_TYPE_GRAPHICS_REQUIREMENTS_D3D12_KHR };
+//				XrResult res = xrGetD3D12GraphicsRequirementsKHR( m_instance, m_systemId, &graphicsRequirements );
+//				if ( XR_FAILED( res ) )
+//				{
+//					return false;
+//				}
+//
+//#    if ENGINE_DLL
+//                // Load the dll and import GetEngineFactoryD3D12() function
+//                auto GetEngineFactoryD3D12 = LoadGraphicsEngineD3D12();
+//#    endif
+//                EngineD3D12CreateInfo EngineCI;
+//				EngineCI.AdapterId = GetAdapterIndexFromLuid( graphicsRequirements.adapterLuid );
+//				EngineCI.GraphicsAPIVersion = Version { 12, 0 };
+//
+//                auto* pFactoryD3D12 = GetEngineFactoryD3D12();
+//				m_pEngineFactory = pFactoryD3D12;
+//                pFactoryD3D12->CreateDeviceAndContextsD3D12(EngineCI, &m_pGraphicsBinding->GetRenderDevice(), &m_pGraphicsBinding->GetImmediateContext());
+//                Win32NativeWindow Window{hWnd};
+//                pFactoryD3D12->CreateSwapChainD3D12(m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), SCDesc, FullScreenModeDesc{}, Window, &m_pSwapChain);
+//            }
+//            break;
+//#endif
+//
+//
+//#if GL_SUPPORTED
+//            case RENDER_DEVICE_TYPE_GL:
+//            {
+//				FETCH_AND_DEFINE_XR_FUNCTION( m_instance, xrGetOpenGLGraphicsRequirementsKHR );
+//				// we don't have any way to specify the adapter in OpenGL, but we're required to get the graphics
+//                // requirements anyway
+//				XrGraphicsRequirementsOpenGLKHR graphicsRequirements = { XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR };
+//				XrResult res = xrGetOpenGLGraphicsRequirementsKHR( m_instance, m_systemId, &graphicsRequirements );
+//				if ( XR_FAILED( res ) )
+//				{
+//					return false;
+//				}
+//#    if EXPLICITLY_LOAD_ENGINE_GL_DLL
+//                // Load the dll and import GetEngineFactoryOpenGL() function
+//                auto GetEngineFactoryOpenGL = LoadGraphicsEngineOpenGL();
+//#    endif
+//                auto* pFactoryOpenGL = GetEngineFactoryOpenGL();
+//				m_pEngineFactory = pFactoryOpenGL;
+//
+//                EngineGLCreateInfo EngineCI;
+//                EngineCI.Window.hWnd = hWnd;
+//
+//                pFactoryOpenGL->CreateDeviceAndSwapChainGL(EngineCI, &m_pGraphicsBinding->GetRenderDevice(), &m_pGraphicsBinding->GetImmediateContext(), SCDesc, &m_pSwapChain);
+//            }
+//            break;
+//#endif
+//
+//
+//#if VULKAN_SUPPORTED
+//            case RENDER_DEVICE_TYPE_VULKAN:
+//            {
+//                // TODO: Vulkan requires that the runtime create the instance. That's going to require a change to 
+//                // CrateDeviceAndContextsVk, probably
+//#    if EXPLICITLY_LOAD_ENGINE_VK_DLL
+//                // Load the dll and import GetEngineFactoryVk() function
+//                auto GetEngineFactoryVk = LoadGraphicsEngineVk();
+//#    endif
+//                EngineVkCreateInfo EngineCI;
+//
+//                auto* pFactoryVk = GetEngineFactoryVk();
+//				m_pEngineFactory = pFactoryVk;
+//                pFactoryVk->CreateDeviceAndContextsVk(EngineCI, &m_pGraphicsBinding->GetRenderDevice(), &m_pGraphicsBinding->GetImmediateContext());
+//
+//                if (!m_pSwapChain && hWnd != nullptr)
+//                {
+//                    Win32NativeWindow Window{hWnd};
+//                    pFactoryVk->CreateSwapChainVk(m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), SCDesc, Window, &m_pSwapChain);
+//                }
+//            }
+//            break;
+//#endif
 
 
             default:
@@ -728,11 +690,11 @@ public:
 
 
 #if D3D11_SUPPORTED
-    IRenderDeviceD3D11* GetD3D11Device() { return (IRenderDeviceD3D11 *)m_pDevice.RawPtr(); }
+    IRenderDeviceD3D11* GetD3D11Device() { return (IRenderDeviceD3D11 *)m_pGraphicsBinding->GetRenderDevice(); }
 #endif
 
 #if D3D12_SUPPORTED
-	IRenderDeviceD3D12* GetD3D12Device() { return (IRenderDeviceD3D12*)m_pDevice.RawPtr(); }
+	IRenderDeviceD3D12* GetD3D12Device() { return (IRenderDeviceD3D12*)m_pGraphicsBinding->GetRenderDevice(); }
 #endif
 
     void Render();
@@ -780,18 +742,16 @@ private:
 	RefCntAutoPtr<IBuffer>                m_VSConstants;
 	float4x4                              m_CubeToWorld;
 	float4x4                              m_ViewToProj;
-	RefCntAutoPtr<IEngineFactory>         m_pEngineFactory;
 
-    RefCntAutoPtr<IRenderDevice>  m_pDevice;
-    RefCntAutoPtr<IDeviceContext> m_pImmediateContext;
     RefCntAutoPtr<ISwapChain>     m_pSwapChain;
 	std::vector< RefCntAutoPtr<ITextureView> >  m_rpEyeSwapchainViews[2];
 	std::vector< RefCntAutoPtr<ITextureView> >  m_rpEyeDepthViews[ 2 ];
     RENDER_DEVICE_TYPE            m_DeviceType = RENDER_DEVICE_TYPE_D3D11;
+    std::unique_ptr<IGraphicsBinding> m_pGraphicsBinding;
 
-    XrInstance m_instance;
-    XrSystemId m_systemId;
-    XrSession m_session;
+    XrInstance m_instance = XR_NULL_HANDLE;
+    XrSystemId m_systemId = XR_NULL_SYSTEM_ID;
+    XrSession m_session = XR_NULL_HANDLE;
     XrViewConfigurationView m_views[ 2 ] = {};
     XrSwapchain m_swapchain = XR_NULL_HANDLE;
 	XrSwapchain m_depthSwapchain = XR_NULL_HANDLE;
@@ -937,9 +897,9 @@ bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextu
 {
 	// Clear the back buffer
 	const float ClearColor[] = { 1.f, 0.350f, 0.350f, 1.0f };
-	m_pImmediateContext->SetRenderTargets( 1, &eyeBuffer, depthBuffer, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
-	m_pImmediateContext->ClearRenderTarget( eyeBuffer, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
-	m_pImmediateContext->ClearDepthStencil( depthBuffer, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+	m_pGraphicsBinding->GetImmediateContext()->SetRenderTargets( 1, &eyeBuffer, depthBuffer, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+	m_pGraphicsBinding->GetImmediateContext()->ClearRenderTarget( eyeBuffer, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+	m_pGraphicsBinding->GetImmediateContext()->ClearDepthStencil( depthBuffer, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 
     float4x4 eyeToProj;
     float4x4_CreateProjection( &eyeToProj, m_DeviceType, view.fov, 0.01f, 10.f );
@@ -952,28 +912,28 @@ bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextu
 
 	{
 		// Map the buffer and write current world-view-projection matrix
-		MapHelper<float4x4> CBConstants( m_pImmediateContext, m_VSConstants, MAP_WRITE, MAP_FLAG_DISCARD );
+		MapHelper<float4x4> CBConstants( m_pGraphicsBinding->GetImmediateContext(), m_VSConstants, MAP_WRITE, MAP_FLAG_DISCARD );
 		*CBConstants = ( m_CubeToWorld * stageToEye * eyeToProj ).Transpose();
 	}
 
 	// Bind vertex and index buffers
 	Uint32   offset = 0;
 	IBuffer* pBuffs[] = { m_CubeVertexBuffer };
-	m_pImmediateContext->SetVertexBuffers( 0, 1, pBuffs, &offset, RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET );
-	m_pImmediateContext->SetIndexBuffer( m_CubeIndexBuffer, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+	m_pGraphicsBinding->GetImmediateContext()->SetVertexBuffers( 0, 1, pBuffs, &offset, RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET );
+	m_pGraphicsBinding->GetImmediateContext()->SetIndexBuffer( m_CubeIndexBuffer, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 
 	// Set the pipeline state
-	m_pImmediateContext->SetPipelineState( m_pPSO );
+	m_pGraphicsBinding->GetImmediateContext()->SetPipelineState( m_pPSO );
 	// Commit shader resources. RESOURCE_STATE_TRANSITION_MODE_TRANSITION mode
 	// makes sure that resources are transitioned to required states.
-	m_pImmediateContext->CommitShaderResources( m_pSRB, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+	m_pGraphicsBinding->GetImmediateContext()->CommitShaderResources( m_pSRB, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 
 	DrawIndexedAttribs DrawAttrs;     // This is an indexed draw call
 	DrawAttrs.IndexType = VT_UINT32; // Index type
 	DrawAttrs.NumIndices = 36;
 	// Verify the state of vertex and index buffers
 	DrawAttrs.Flags = DRAW_FLAG_VERIFY_ALL;
-	m_pImmediateContext->DrawIndexed( DrawAttrs );
+	m_pGraphicsBinding->GetImmediateContext()->DrawIndexed( DrawAttrs );
 
     return true;
 }
@@ -1019,7 +979,7 @@ void HelloXrApp::CreatePipelineState()
 	// In this tutorial, we will load shaders from file. To be able to do that,
 	// we need to create a shader source stream factory
 	RefCntAutoPtr<IShaderSourceInputStreamFactory> pShaderSourceFactory;
-	m_pEngineFactory->CreateDefaultShaderSourceStreamFactory( nullptr, &pShaderSourceFactory );
+	m_pGraphicsBinding->GetEngineFactory()->CreateDefaultShaderSourceStreamFactory( nullptr, &pShaderSourceFactory );
 	ShaderCI.pShaderSourceStreamFactory = pShaderSourceFactory;
 	// Create a vertex shader
 	RefCntAutoPtr<IShader> pVS;
@@ -1028,7 +988,7 @@ void HelloXrApp::CreatePipelineState()
 		ShaderCI.EntryPoint = "main";
 		ShaderCI.Desc.Name = "Cube VS";
 		ShaderCI.FilePath = "cube.vsh";
-		m_pDevice->CreateShader( ShaderCI, &pVS );
+		m_pGraphicsBinding->GetRenderDevice()->CreateShader( ShaderCI, &pVS );
 		// Create dynamic uniform buffer that will store our transformation matrix
 		// Dynamic buffers can be frequently updated by the CPU
 		BufferDesc CBDesc;
@@ -1037,7 +997,7 @@ void HelloXrApp::CreatePipelineState()
 		CBDesc.Usage = USAGE_DYNAMIC;
 		CBDesc.BindFlags = BIND_UNIFORM_BUFFER;
 		CBDesc.CPUAccessFlags = CPU_ACCESS_WRITE;
-		m_pDevice->CreateBuffer( CBDesc, nullptr, &m_VSConstants );
+		m_pGraphicsBinding->GetRenderDevice()->CreateBuffer( CBDesc, nullptr, &m_VSConstants );
 	}
 
 	// Create a pixel shader
@@ -1047,7 +1007,7 @@ void HelloXrApp::CreatePipelineState()
 		ShaderCI.EntryPoint = "main";
 		ShaderCI.Desc.Name = "Cube PS";
 		ShaderCI.FilePath = "cube.psh";
-		m_pDevice->CreateShader( ShaderCI, &pPS );
+		m_pGraphicsBinding->GetRenderDevice()->CreateShader( ShaderCI, &pPS );
 	}
 
 	// clang-format off
@@ -1069,7 +1029,7 @@ void HelloXrApp::CreatePipelineState()
 	// Define variable type that will be used by default
 	PSOCreateInfo.PSODesc.ResourceLayout.DefaultVariableType = SHADER_RESOURCE_VARIABLE_TYPE_STATIC;
 
-	m_pDevice->CreateGraphicsPipelineState( PSOCreateInfo, &m_pPSO );
+	m_pGraphicsBinding->GetRenderDevice()->CreateGraphicsPipelineState( PSOCreateInfo, &m_pPSO );
 
 	// Since we did not explcitly specify the type for 'Constants' variable, default
 	// type (SHADER_RESOURCE_VARIABLE_TYPE_STATIC) will be used. Static variables never
@@ -1130,7 +1090,7 @@ void HelloXrApp::CreateVertexBuffer()
 	BufferData VBData;
 	VBData.pData = CubeVerts;
 	VBData.DataSize = sizeof( CubeVerts );
-	m_pDevice->CreateBuffer( VertBuffDesc, &VBData, &m_CubeVertexBuffer );
+	m_pGraphicsBinding->GetRenderDevice()->CreateBuffer( VertBuffDesc, &VBData, &m_CubeVertexBuffer );
 }
 
 void HelloXrApp::CreateIndexBuffer()
@@ -1155,7 +1115,7 @@ void HelloXrApp::CreateIndexBuffer()
 	BufferData IBData;
 	IBData.pData = Indices;
 	IBData.DataSize = sizeof( Indices );
-	m_pDevice->CreateBuffer( IndBuffDesc, &IBData, &m_CubeIndexBuffer );
+	m_pGraphicsBinding->GetRenderDevice()->CreateBuffer( IndBuffDesc, &IBData, &m_CubeIndexBuffer );
 }
 
 // Render a frame
@@ -1165,35 +1125,35 @@ void HelloXrApp::Render()
 	auto* pDSV = m_pSwapChain->GetDepthBufferDSV();
 	// Clear the back buffer
 	const float ClearColor[] = { 0.350f, 0.350f, 0.350f, 1.0f };
-    m_pImmediateContext->SetRenderTargets( 1, &pRTV, pDSV, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
-	m_pImmediateContext->ClearRenderTarget( pRTV, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
-	m_pImmediateContext->ClearDepthStencil( pDSV, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+    m_pGraphicsBinding->GetImmediateContext()->SetRenderTargets( 1, &pRTV, pDSV, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+	m_pGraphicsBinding->GetImmediateContext()->ClearRenderTarget( pRTV, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+	m_pGraphicsBinding->GetImmediateContext()->ClearDepthStencil( pDSV, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 
     float4x4 stageToDesktopView = float4x4::Translation( 0.f, 0.0f, -2.5f );
 	{
 		// Map the buffer and write current world-view-projection matrix
-		MapHelper<float4x4> CBConstants( m_pImmediateContext, m_VSConstants, MAP_WRITE, MAP_FLAG_DISCARD );
+		MapHelper<float4x4> CBConstants( m_pGraphicsBinding->GetImmediateContext(), m_VSConstants, MAP_WRITE, MAP_FLAG_DISCARD );
 		*CBConstants = ( m_CubeToWorld * stageToDesktopView * m_ViewToProj ).Transpose();
 	}
 
 	// Bind vertex and index buffers
 	Uint32   offset = 0;
 	IBuffer* pBuffs[] = { m_CubeVertexBuffer };
-	m_pImmediateContext->SetVertexBuffers( 0, 1, pBuffs, &offset, RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET );
-	m_pImmediateContext->SetIndexBuffer( m_CubeIndexBuffer, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+	m_pGraphicsBinding->GetImmediateContext()->SetVertexBuffers( 0, 1, pBuffs, &offset, RESOURCE_STATE_TRANSITION_MODE_TRANSITION, SET_VERTEX_BUFFERS_FLAG_RESET );
+	m_pGraphicsBinding->GetImmediateContext()->SetIndexBuffer( m_CubeIndexBuffer, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 
 	// Set the pipeline state
-	m_pImmediateContext->SetPipelineState( m_pPSO );
+	m_pGraphicsBinding->GetImmediateContext()->SetPipelineState( m_pPSO );
 	// Commit shader resources. RESOURCE_STATE_TRANSITION_MODE_TRANSITION mode
 	// makes sure that resources are transitioned to required states.
-	m_pImmediateContext->CommitShaderResources( m_pSRB, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+	m_pGraphicsBinding->GetImmediateContext()->CommitShaderResources( m_pSRB, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 
 	DrawIndexedAttribs DrawAttrs;     // This is an indexed draw call
 	DrawAttrs.IndexType = VT_UINT32; // Index type
 	DrawAttrs.NumIndices = 36;
 	// Verify the state of vertex and index buffers
 	DrawAttrs.Flags = DRAW_FLAG_VERIFY_ALL;
-	m_pImmediateContext->DrawIndexed( DrawAttrs );
+	m_pGraphicsBinding->GetImmediateContext()->DrawIndexed( DrawAttrs );
 }
 
 
