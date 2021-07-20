@@ -4,8 +4,7 @@
 
 using namespace Diligent;
 
-std::unique_ptr<IGraphicsBinding> IGraphicsBinding::CreateBindingForDeviceType( Diligent::RENDER_DEVICE_TYPE deviceType,
-	XrInstance instance, XrSystemId systemId )
+std::unique_ptr<IGraphicsBinding> IGraphicsBinding::CreateBindingForDeviceType( Diligent::RENDER_DEVICE_TYPE deviceType )
 {
 	std::unique_ptr< IGraphicsBinding > binding;
 	switch ( deviceType )
@@ -15,11 +14,6 @@ std::unique_ptr<IGraphicsBinding> IGraphicsBinding::CreateBindingForDeviceType( 
 		break;
 
 	default:
-		return nullptr;
-	}
-
-	if ( !XR_SUCCEEDED( binding->Init( instance, systemId ) ) )
-	{
 		return nullptr;
 	}
 

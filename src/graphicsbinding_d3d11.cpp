@@ -39,9 +39,19 @@ UINT GetAdapterIndexFromLuid( LUID adapterId )
 }
 #endif
 
+GraphicsBinding_D3D11::~GraphicsBinding_D3D11()
+{
+	delete m_d3d11Binding;
+}
 
 
-XrResult GraphicsBinding_D3D11::Init( XrInstance instance, XrSystemId systemId )
+std::vector<std::string> GraphicsBinding_D3D11::GetXrExtensions()
+{
+	return { XR_KHR_D3D11_ENABLE_EXTENSION_NAME };
+}
+
+
+XrResult GraphicsBinding_D3D11::CreateDevice( XrInstance instance, XrSystemId systemId )
 {
 	m_instance = instance;
 	m_systemId = systemId;
@@ -66,6 +76,9 @@ XrResult GraphicsBinding_D3D11::Init( XrInstance instance, XrSystemId systemId )
 	EngineCI.GraphicsAPIVersion = Version { 11, 0 };
 	pFactoryD3D11->CreateDeviceAndContextsD3D11( EngineCI, &m_pDevice, &m_pImmediateContext );
 
+	m_d3d11Binding = new XrGraphicsBindingD3D11KHR( { XR_TYPE_GRAPHICS_BINDING_D3D11_KHR } );
+	m_d3d11Binding->device = GetD3D11Device()->GetD3D11Device();
+
 	return XR_SUCCESS;
 }
 
@@ -75,3 +88,26 @@ Diligent::IEngineFactory* GraphicsBinding_D3D11::GetEngineFactory()
 	return m_pEngineFactory.RawPtr();
 }
 
+std::vector<int64_t> GraphicsBinding_D3D11::GetRequestedColorFormats()
+{
+	return
+	{
+		DXGI_FORMAT_R16G16B16A16_FLOAT,
+		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
+	};
+}
+
+std::vector<int64_t> GraphicsBinding_D3D11::GetRequestedDepthFormats()
+{
+	return 
+	{
+		DXGI_FORMAT_D32_FLOAT,
+		DXGI_FORMAT_D16_UNORM,
+	};
+}
+
+
+void* GraphicsBinding_D3D11::GetSessionBinding()
+{
+	return m_d3d11Binding;
+}

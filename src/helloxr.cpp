@@ -171,16 +171,23 @@ public:
 
     bool Initialize(HWND hWnd)
     {
+        m_pGraphicsBinding = IGraphicsBinding::CreateBindingForDeviceType( m_DeviceType );
+        if ( !m_pGraphicsBinding )
+        {
+            return false;
+        }
+
 		// create the OpenXR instance first because it will have an opinion about device creation
         if( !InitializeOpenXr() )
         {
             return false;
         }
-        m_pGraphicsBinding = IGraphicsBinding::CreateBindingForDeviceType( m_DeviceType, m_instance, m_systemId );
-        if ( !m_pGraphicsBinding )
-        {
-            return false;
-        }
+
+		if ( !XR_SUCCEEDED( m_pGraphicsBinding->CreateDevice( m_instance, m_systemId ) ) )
+		{
+			return false;
+		}
+
 
  	    Win32NativeWindow Window { hWnd };
         SwapChainDesc SCDesc;
@@ -303,45 +310,45 @@ public:
     {
         XrExtensionMap availableExtensions = GetAvailableOpenXRExtensions();
 
-         std::vector< std::string > xrExtensions;
+         std::vector< std::string > xrExtensions = m_pGraphicsBinding->GetXrExtensions();
 
-        switch ( m_DeviceType )
-        {
-#if D3D11_SUPPORTED
-        case RENDER_DEVICE_TYPE_D3D11:
-        {
-            xrExtensions.push_back( XR_KHR_D3D11_ENABLE_EXTENSION_NAME );
-        }
-        break;
-#endif
-
-
-#if D3D12_SUPPORTED
-        case RENDER_DEVICE_TYPE_D3D12:
-        {
-            xrExtensions.push_back( XR_KHR_D3D12_ENABLE_EXTENSION_NAME );
-        }
-        break;
-#endif
-
-
-#if GL_SUPPORTED
-        case RENDER_DEVICE_TYPE_GL:
-        {
-            xrExtensions.push_back( XR_KHR_OPENGL_ENABLE_EXTENSION_NAME );
-        }
-        break;
-#endif
-
-
-#if VULKAN_SUPPORTED
-        case RENDER_DEVICE_TYPE_VULKAN:
-        {
-            xrExtensions.push_back( XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME );
-        }
-        break;
-#endif
-        }
+//        switch ( m_DeviceType )
+//        {
+//#if D3D11_SUPPORTED
+//        case RENDER_DEVICE_TYPE_D3D11:
+//        {
+//            xrExtensions.push_back( XR_KHR_D3D11_ENABLE_EXTENSION_NAME );
+//        }
+//        break;
+//#endif
+//
+//
+//#if D3D12_SUPPORTED
+//        case RENDER_DEVICE_TYPE_D3D12:
+//        {
+//            xrExtensions.push_back( XR_KHR_D3D12_ENABLE_EXTENSION_NAME );
+//        }
+//        break;
+//#endif
+//
+//
+//#if GL_SUPPORTED
+//        case RENDER_DEVICE_TYPE_GL:
+//        {
+//            xrExtensions.push_back( XR_KHR_OPENGL_ENABLE_EXTENSION_NAME );
+//        }
+//        break;
+//#endif
+//
+//
+//#if VULKAN_SUPPORTED
+//        case RENDER_DEVICE_TYPE_VULKAN:
+//        {
+//            xrExtensions.push_back( XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME );
+//        }
+//        break;
+//#endif
+//        }
 
         if ( xrExtensions.empty() )
         {
@@ -400,59 +407,52 @@ public:
         createInfo.systemId = m_systemId;
         createInfo.createFlags = 0;
 
-        std::vector< int64_t > requestedFormats;
-		std::vector< int64_t > requestedDepthFormats;
-        switch ( m_DeviceType )
-        {
-#if D3D11_SUPPORTED
-		case RENDER_DEVICE_TYPE_D3D11:
-		{
-            requestedFormats.push_back( DXGI_FORMAT_R16G16B16A16_FLOAT );
-			requestedFormats.push_back( DXGI_FORMAT_R8G8B8A8_UNORM );
-			requestedDepthFormats.push_back( DXGI_FORMAT_D32_FLOAT );
-            requestedDepthFormats.push_back( DXGI_FORMAT_D16_UNORM );
-
-            static XrGraphicsBindingD3D11KHR d3d11Binding = { XR_TYPE_GRAPHICS_BINDING_D3D11_KHR };
-            createInfo.next = &d3d11Binding;
-
-            d3d11Binding.device = GetD3D11Device()->GetD3D11Device();
-		}
-		break;
-#endif
-
-
-#if D3D12_SUPPORTED
-		case RENDER_DEVICE_TYPE_D3D12:
-		{
-			requestedFormats.push_back( DXGI_FORMAT_R16G16B16A16_FLOAT );
-			requestedFormats.push_back( DXGI_FORMAT_R8G8B8A8_UNORM );
-			requestedDepthFormats.push_back( DXGI_FORMAT_D32_FLOAT );
-			requestedDepthFormats.push_back( DXGI_FORMAT_D16_UNORM );
-
-			static XrGraphicsBindingD3D12KHR d3d12Binding = { XR_TYPE_GRAPHICS_BINDING_D3D12_KHR };
-			createInfo.next = &d3d12Binding;
-
-			d3d12Binding.device = GetD3D12Device()->GetD3D12Device();
-		}
-		break;
-#endif
-
-
-#if GL_SUPPORTED
-		case RENDER_DEVICE_TYPE_GL:
-		{
-		}
-		break;
-#endif
-
-
-#if VULKAN_SUPPORTED
-		case RENDER_DEVICE_TYPE_VULKAN:
-		{
-		}
-		break;
-#endif
-        }
+        std::vector< int64_t > requestedFormats = m_pGraphicsBinding->GetRequestedColorFormats();
+        std::vector< int64_t > requestedDepthFormats = m_pGraphicsBinding->GetRequestedDepthFormats();
+        createInfo.next = m_pGraphicsBinding->GetSessionBinding();
+//        switch ( m_DeviceType )
+//        {
+//#if D3D11_SUPPORTED
+//		case RENDER_DEVICE_TYPE_D3D11:
+//		{
+//
+//		}
+//		break;
+//#endif
+//
+//
+//#if D3D12_SUPPORTED
+//		case RENDER_DEVICE_TYPE_D3D12:
+//		{
+//			requestedFormats.push_back( DXGI_FORMAT_R16G16B16A16_FLOAT );
+//			requestedFormats.push_back( DXGI_FORMAT_R8G8B8A8_UNORM );
+//			requestedDepthFormats.push_back( DXGI_FORMAT_D32_FLOAT );
+//			requestedDepthFormats.push_back( DXGI_FORMAT_D16_UNORM );
+//
+//			static XrGraphicsBindingD3D12KHR d3d12Binding = { XR_TYPE_GRAPHICS_BINDING_D3D12_KHR };
+//			createInfo.next = &d3d12Binding;
+//
+//			d3d12Binding.device = GetD3D12Device()->GetD3D12Device();
+//		}
+//		break;
+//#endif
+//
+//
+//#if GL_SUPPORTED
+//		case RENDER_DEVICE_TYPE_GL:
+//		{
+//		}
+//		break;
+//#endif
+//
+//
+//#if VULKAN_SUPPORTED
+//		case RENDER_DEVICE_TYPE_VULKAN:
+//		{
+//		}
+//		break;
+//#endif
+//        }
 
         CHECK_XR_RESULT( xrCreateSession( m_instance, &createInfo, &m_session ) );
 
