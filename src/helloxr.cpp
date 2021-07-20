@@ -593,7 +593,9 @@ public:
 
 	void Present()
 	{
-		m_pSwapChain->Present();
+		// We use a swap interval of 0 here so the desktop window won't wait. We want all the waiting to happen because 
+		// of xrWaitFrame.
+		m_pSwapChain->Present( 0 );
 	}
 
 	void WindowResize(Uint32 Width, Uint32 Height)
