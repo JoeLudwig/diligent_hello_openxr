@@ -166,7 +166,10 @@ public:
 
 	~HelloXrApp()
 	{
-		m_pGraphicsBinding->GetImmediateContext()->Flush();
+		if (m_pGraphicsBinding)
+		{
+			m_pGraphicsBinding->GetImmediateContext()->Flush();
+		}
 	}
 
 	bool Initialize(HWND hWnd)
@@ -205,37 +208,19 @@ public:
 			}
 			break;
 #endif
+#if D3D12_SUPPORTED
+			case RENDER_DEVICE_TYPE_D3D12:
+			{
+#	if ENGINE_DLL
+				// Load the dll and import GetEngineFactoryD3D11() function
+				auto* GetEngineFactoryD3D12 = LoadGraphicsEngineD3D12();
+#	endif
+				auto* pFactoryD3D12 = GetEngineFactoryD3D12();
+				pFactoryD3D12->CreateSwapChainD3D12( m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), SCDesc, FullScreenModeDesc {}, Window, &m_pSwapChain );
+			}
+			break;
+#endif
 
-//
-//#if D3D12_SUPPORTED
-//			case RENDER_DEVICE_TYPE_D3D12:
-//			{
-//				FETCH_AND_DEFINE_XR_FUNCTION( m_instance, xrGetD3D12GraphicsRequirementsKHR );
-//				XrGraphicsRequirementsD3D12KHR graphicsRequirements = { XR_TYPE_GRAPHICS_REQUIREMENTS_D3D12_KHR };
-//				XrResult res = xrGetD3D12GraphicsRequirementsKHR( m_instance, m_systemId, &graphicsRequirements );
-//				if ( XR_FAILED( res ) )
-//				{
-//					return false;
-//				}
-//
-//#	if ENGINE_DLL
-//				// Load the dll and import GetEngineFactoryD3D12() function
-//				auto GetEngineFactoryD3D12 = LoadGraphicsEngineD3D12();
-//#	endif
-//				EngineD3D12CreateInfo EngineCI;
-//				EngineCI.AdapterId = GetAdapterIndexFromLuid( graphicsRequirements.adapterLuid );
-//				EngineCI.GraphicsAPIVersion = Version { 12, 0 };
-//
-//				auto* pFactoryD3D12 = GetEngineFactoryD3D12();
-//				m_pEngineFactory = pFactoryD3D12;
-//				pFactoryD3D12->CreateDeviceAndContextsD3D12(EngineCI, &m_pGraphicsBinding->GetRenderDevice(), &m_pGraphicsBinding->GetImmediateContext());
-//				Win32NativeWindow Window{hWnd};
-//				pFactoryD3D12->CreateSwapChainD3D12(m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), SCDesc, FullScreenModeDesc{}, Window, &m_pSwapChain);
-//			}
-//			break;
-//#endif
-//
-//
 //#if GL_SUPPORTED
 //			case RENDER_DEVICE_TYPE_GL:
 //			{
