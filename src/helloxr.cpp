@@ -6,7 +6,7 @@
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
  *  
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *	  http://www.apache.org/licenses/LICENSE-2.0
  *  
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,33 +33,33 @@
 #include <map>
 
 #ifndef NOMINMAX
-#    define NOMINMAX
+#	define NOMINMAX
 #endif
 #include <Windows.h>
 #include <crtdbg.h>
 
 #ifndef PLATFORM_WIN32
-#    define PLATFORM_WIN32 1
+#	define PLATFORM_WIN32 1
 #endif
 
 #ifndef ENGINE_DLL
-#    define ENGINE_DLL 1
+#	define ENGINE_DLL 1
 #endif
 
 #ifndef D3D11_SUPPORTED
-#    define D3D11_SUPPORTED 1
+#	define D3D11_SUPPORTED 1
 #endif
 
 #ifndef D3D12_SUPPORTED
-#    define D3D12_SUPPORTED 1
+#	define D3D12_SUPPORTED 1
 #endif
 
 #ifndef GL_SUPPORTED
-#    define GL_SUPPORTED 1
+#	define GL_SUPPORTED 1
 #endif
 
 #ifndef VULKAN_SUPPORTED
-#    define VULKAN_SUPPORTED 1
+#	define VULKAN_SUPPORTED 1
 #endif
 
 #include <Graphics/GraphicsEngine/interface/EngineFactory.h>
@@ -84,22 +84,22 @@
 // Make sure the supported OpenXR graphics APIs are defined
 #if D3D11_SUPPORTED
 #include <d3d11.h>
-#    define XR_USE_GRAPHICS_API_D3D11
+#	define XR_USE_GRAPHICS_API_D3D11
 #include "Graphics/GraphicsEngineD3D11/interface/RenderDeviceD3D11.h"
 #endif
 
 #if D3D12_SUPPORTED
 #include <d3d12.h>
-#    define XR_USE_GRAPHICS_API_D3D12
+#	define XR_USE_GRAPHICS_API_D3D12
 #include "Graphics/GraphicsEngineD3D12/interface/RenderDeviceD3D12.h"
 #endif
 
 #if GL_SUPPORTED
-#    define XR_USE_GRAPHICS_API_OPENGL
+#	define XR_USE_GRAPHICS_API_OPENGL
 #endif
 
 #if VULKAN_SUPPORTED
-#    define XR_USE_GRAPHICS_API_VULKAN
+#	define XR_USE_GRAPHICS_API_VULKAN
 #include <vulkan/vulkan.h>
 #endif
 
@@ -108,20 +108,20 @@
 #include "igraphicsbinding.h"
 
 #define CHECK_XR_RESULT( res ) \
-    do { \
-        if( FAILED( res ) ) \
-            return false; \
-    } \
-    while ( 0 );
+	do { \
+		if( FAILED( res ) ) \
+			return false; \
+	} \
+	while ( 0 );
 
 using namespace Diligent;
 
 XrPosef IdentityXrPose()
 {
-    XrPosef pose;
-    pose.orientation = { 0, 0, 0, 1.f };
+	XrPosef pose;
+	pose.orientation = { 0, 0, 0, 1.f };
 	pose.position = { 0, 0, 0 };
-    return pose;
+	return pose;
 }
 
 
@@ -129,59 +129,59 @@ typedef std::map< std::string, uint32_t > XrExtensionMap;
 
 XrExtensionMap GetAvailableOpenXRExtensions()
 {
-    uint32_t neededSize = 0;
-    if ( XR_FAILED( xrEnumerateInstanceExtensionProperties( nullptr, 0, &neededSize, nullptr ) ) )
-    {
-        return {};
-    }
+	uint32_t neededSize = 0;
+	if ( XR_FAILED( xrEnumerateInstanceExtensionProperties( nullptr, 0, &neededSize, nullptr ) ) )
+	{
+		return {};
+	}
 
-    if ( !neededSize )
-    {
-        // How can a runtime not enumerate at least one graphics binding extension?
-        return {};
-    }
+	if ( !neededSize )
+	{
+		// How can a runtime not enumerate at least one graphics binding extension?
+		return {};
+	}
 
-    std::vector< XrExtensionProperties > properties;
-    properties.resize( neededSize, { XR_TYPE_EXTENSION_PROPERTIES } );
-    uint32_t readSize = 0;
-    if ( XR_FAILED( xrEnumerateInstanceExtensionProperties( nullptr, neededSize, &readSize, &properties[ 0 ] ) ) )
-    {
-        return {};
-    }
+	std::vector< XrExtensionProperties > properties;
+	properties.resize( neededSize, { XR_TYPE_EXTENSION_PROPERTIES } );
+	uint32_t readSize = 0;
+	if ( XR_FAILED( xrEnumerateInstanceExtensionProperties( nullptr, neededSize, &readSize, &properties[ 0 ] ) ) )
+	{
+		return {};
+	}
 
-    XrExtensionMap res;
-    for ( auto& prop : properties )
-    {
-        res.insert( std::make_pair( std::string( prop.extensionName ), prop.extensionVersion ) );
-    }
-    return res;
+	XrExtensionMap res;
+	for ( auto& prop : properties )
+	{
+		res.insert( std::make_pair( std::string( prop.extensionName ), prop.extensionVersion ) );
+	}
+	return res;
 }
 
 class HelloXrApp
 {
 public:
-    HelloXrApp()
-    {
-    }
+	HelloXrApp()
+	{
+	}
 
-    ~HelloXrApp()
-    {
-        m_pGraphicsBinding->GetImmediateContext()->Flush();
-    }
+	~HelloXrApp()
+	{
+		m_pGraphicsBinding->GetImmediateContext()->Flush();
+	}
 
-    bool Initialize(HWND hWnd)
-    {
-        m_pGraphicsBinding = IGraphicsBinding::CreateBindingForDeviceType( m_DeviceType );
-        if ( !m_pGraphicsBinding )
-        {
-            return false;
-        }
+	bool Initialize(HWND hWnd)
+	{
+		m_pGraphicsBinding = IGraphicsBinding::CreateBindingForDeviceType( m_DeviceType );
+		if ( !m_pGraphicsBinding )
+		{
+			return false;
+		}
 
 		// create the OpenXR instance first because it will have an opinion about device creation
-        if( !InitializeOpenXr() )
-        {
-            return false;
-        }
+		if( !InitializeOpenXr() )
+		{
+			return false;
+		}
 
 		if ( !XR_SUCCEEDED( m_pGraphicsBinding->CreateDevice( m_instance, m_systemId ) ) )
 		{
@@ -189,27 +189,27 @@ public:
 		}
 
 
- 	    Win32NativeWindow Window { hWnd };
-        SwapChainDesc SCDesc;
-        switch (m_DeviceType)
-        {
+ 		Win32NativeWindow Window { hWnd };
+		SwapChainDesc SCDesc;
+		switch (m_DeviceType)
+		{
 #if D3D11_SUPPORTED
-            case RENDER_DEVICE_TYPE_D3D11:
-            {
-#    if ENGINE_DLL
+			case RENDER_DEVICE_TYPE_D3D11:
+			{
+#	if ENGINE_DLL
 				// Load the dll and import GetEngineFactoryD3D11() function
 				auto* GetEngineFactoryD3D11 = LoadGraphicsEngineD3D11();
-#    endif
+#	endif
 				auto* pFactoryD3D11 = GetEngineFactoryD3D11();
 				pFactoryD3D11->CreateSwapChainD3D11( m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), SCDesc, FullScreenModeDesc {}, Window, &m_pSwapChain );
-            }
-            break;
+			}
+			break;
 #endif
 
 //
 //#if D3D12_SUPPORTED
-//            case RENDER_DEVICE_TYPE_D3D12:
-//            {
+//			case RENDER_DEVICE_TYPE_D3D12:
+//			{
 //				FETCH_AND_DEFINE_XR_FUNCTION( m_instance, xrGetD3D12GraphicsRequirementsKHR );
 //				XrGraphicsRequirementsD3D12KHR graphicsRequirements = { XR_TYPE_GRAPHICS_REQUIREMENTS_D3D12_KHR };
 //				XrResult res = xrGetD3D12GraphicsRequirementsKHR( m_instance, m_systemId, &graphicsRequirements );
@@ -218,207 +218,207 @@ public:
 //					return false;
 //				}
 //
-//#    if ENGINE_DLL
-//                // Load the dll and import GetEngineFactoryD3D12() function
-//                auto GetEngineFactoryD3D12 = LoadGraphicsEngineD3D12();
-//#    endif
-//                EngineD3D12CreateInfo EngineCI;
+//#	if ENGINE_DLL
+//				// Load the dll and import GetEngineFactoryD3D12() function
+//				auto GetEngineFactoryD3D12 = LoadGraphicsEngineD3D12();
+//#	endif
+//				EngineD3D12CreateInfo EngineCI;
 //				EngineCI.AdapterId = GetAdapterIndexFromLuid( graphicsRequirements.adapterLuid );
 //				EngineCI.GraphicsAPIVersion = Version { 12, 0 };
 //
-//                auto* pFactoryD3D12 = GetEngineFactoryD3D12();
+//				auto* pFactoryD3D12 = GetEngineFactoryD3D12();
 //				m_pEngineFactory = pFactoryD3D12;
-//                pFactoryD3D12->CreateDeviceAndContextsD3D12(EngineCI, &m_pGraphicsBinding->GetRenderDevice(), &m_pGraphicsBinding->GetImmediateContext());
-//                Win32NativeWindow Window{hWnd};
-//                pFactoryD3D12->CreateSwapChainD3D12(m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), SCDesc, FullScreenModeDesc{}, Window, &m_pSwapChain);
-//            }
-//            break;
+//				pFactoryD3D12->CreateDeviceAndContextsD3D12(EngineCI, &m_pGraphicsBinding->GetRenderDevice(), &m_pGraphicsBinding->GetImmediateContext());
+//				Win32NativeWindow Window{hWnd};
+//				pFactoryD3D12->CreateSwapChainD3D12(m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), SCDesc, FullScreenModeDesc{}, Window, &m_pSwapChain);
+//			}
+//			break;
 //#endif
 //
 //
 //#if GL_SUPPORTED
-//            case RENDER_DEVICE_TYPE_GL:
-//            {
+//			case RENDER_DEVICE_TYPE_GL:
+//			{
 //				FETCH_AND_DEFINE_XR_FUNCTION( m_instance, xrGetOpenGLGraphicsRequirementsKHR );
 //				// we don't have any way to specify the adapter in OpenGL, but we're required to get the graphics
-//                // requirements anyway
+//				// requirements anyway
 //				XrGraphicsRequirementsOpenGLKHR graphicsRequirements = { XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR };
 //				XrResult res = xrGetOpenGLGraphicsRequirementsKHR( m_instance, m_systemId, &graphicsRequirements );
 //				if ( XR_FAILED( res ) )
 //				{
 //					return false;
 //				}
-//#    if EXPLICITLY_LOAD_ENGINE_GL_DLL
-//                // Load the dll and import GetEngineFactoryOpenGL() function
-//                auto GetEngineFactoryOpenGL = LoadGraphicsEngineOpenGL();
-//#    endif
-//                auto* pFactoryOpenGL = GetEngineFactoryOpenGL();
+//#	if EXPLICITLY_LOAD_ENGINE_GL_DLL
+//				// Load the dll and import GetEngineFactoryOpenGL() function
+//				auto GetEngineFactoryOpenGL = LoadGraphicsEngineOpenGL();
+//#	endif
+//				auto* pFactoryOpenGL = GetEngineFactoryOpenGL();
 //				m_pEngineFactory = pFactoryOpenGL;
 //
-//                EngineGLCreateInfo EngineCI;
-//                EngineCI.Window.hWnd = hWnd;
+//				EngineGLCreateInfo EngineCI;
+//				EngineCI.Window.hWnd = hWnd;
 //
-//                pFactoryOpenGL->CreateDeviceAndSwapChainGL(EngineCI, &m_pGraphicsBinding->GetRenderDevice(), &m_pGraphicsBinding->GetImmediateContext(), SCDesc, &m_pSwapChain);
-//            }
-//            break;
+//				pFactoryOpenGL->CreateDeviceAndSwapChainGL(EngineCI, &m_pGraphicsBinding->GetRenderDevice(), &m_pGraphicsBinding->GetImmediateContext(), SCDesc, &m_pSwapChain);
+//			}
+//			break;
 //#endif
 //
 //
 //#if VULKAN_SUPPORTED
-//            case RENDER_DEVICE_TYPE_VULKAN:
-//            {
-//                // TODO: Vulkan requires that the runtime create the instance. That's going to require a change to 
-//                // CrateDeviceAndContextsVk, probably
-//#    if EXPLICITLY_LOAD_ENGINE_VK_DLL
-//                // Load the dll and import GetEngineFactoryVk() function
-//                auto GetEngineFactoryVk = LoadGraphicsEngineVk();
-//#    endif
-//                EngineVkCreateInfo EngineCI;
+//			case RENDER_DEVICE_TYPE_VULKAN:
+//			{
+//				// TODO: Vulkan requires that the runtime create the instance. That's going to require a change to 
+//				// CrateDeviceAndContextsVk, probably
+//#	if EXPLICITLY_LOAD_ENGINE_VK_DLL
+//				// Load the dll and import GetEngineFactoryVk() function
+//				auto GetEngineFactoryVk = LoadGraphicsEngineVk();
+//#	endif
+//				EngineVkCreateInfo EngineCI;
 //
-//                auto* pFactoryVk = GetEngineFactoryVk();
+//				auto* pFactoryVk = GetEngineFactoryVk();
 //				m_pEngineFactory = pFactoryVk;
-//                pFactoryVk->CreateDeviceAndContextsVk(EngineCI, &m_pGraphicsBinding->GetRenderDevice(), &m_pGraphicsBinding->GetImmediateContext());
+//				pFactoryVk->CreateDeviceAndContextsVk(EngineCI, &m_pGraphicsBinding->GetRenderDevice(), &m_pGraphicsBinding->GetImmediateContext());
 //
-//                if (!m_pSwapChain && hWnd != nullptr)
-//                {
-//                    Win32NativeWindow Window{hWnd};
-//                    pFactoryVk->CreateSwapChainVk(m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), SCDesc, Window, &m_pSwapChain);
-//                }
-//            }
-//            break;
+//				if (!m_pSwapChain && hWnd != nullptr)
+//				{
+//					Win32NativeWindow Window{hWnd};
+//					pFactoryVk->CreateSwapChainVk(m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), SCDesc, Window, &m_pSwapChain);
+//				}
+//			}
+//			break;
 //#endif
 
 
-            default:
-                std::cerr << "Unknown/unsupported device type";
-                return false;
-                break;
-        }
+			default:
+				std::cerr << "Unknown/unsupported device type";
+				return false;
+				break;
+		}
 
-        if ( !CreateSession() )
-            return false;
+		if ( !CreateSession() )
+			return false;
 
-        CreatePipelineState();
-        CreateVertexBuffer();
-        CreateIndexBuffer();
+		CreatePipelineState();
+		CreateVertexBuffer();
+		CreateIndexBuffer();
 
-        return true;
-    }
+		return true;
+	}
 
 
-    bool InitializeOpenXr()
-    {
-        XrExtensionMap availableExtensions = GetAvailableOpenXRExtensions();
+	bool InitializeOpenXr()
+	{
+		XrExtensionMap availableExtensions = GetAvailableOpenXRExtensions();
 
-         std::vector< std::string > xrExtensions = m_pGraphicsBinding->GetXrExtensions();
+		 std::vector< std::string > xrExtensions = m_pGraphicsBinding->GetXrExtensions();
 
-//        switch ( m_DeviceType )
-//        {
+//		switch ( m_DeviceType )
+//		{
 //#if D3D11_SUPPORTED
-//        case RENDER_DEVICE_TYPE_D3D11:
-//        {
-//            xrExtensions.push_back( XR_KHR_D3D11_ENABLE_EXTENSION_NAME );
-//        }
-//        break;
+//		case RENDER_DEVICE_TYPE_D3D11:
+//		{
+//			xrExtensions.push_back( XR_KHR_D3D11_ENABLE_EXTENSION_NAME );
+//		}
+//		break;
 //#endif
 //
 //
 //#if D3D12_SUPPORTED
-//        case RENDER_DEVICE_TYPE_D3D12:
-//        {
-//            xrExtensions.push_back( XR_KHR_D3D12_ENABLE_EXTENSION_NAME );
-//        }
-//        break;
+//		case RENDER_DEVICE_TYPE_D3D12:
+//		{
+//			xrExtensions.push_back( XR_KHR_D3D12_ENABLE_EXTENSION_NAME );
+//		}
+//		break;
 //#endif
 //
 //
 //#if GL_SUPPORTED
-//        case RENDER_DEVICE_TYPE_GL:
-//        {
-//            xrExtensions.push_back( XR_KHR_OPENGL_ENABLE_EXTENSION_NAME );
-//        }
-//        break;
+//		case RENDER_DEVICE_TYPE_GL:
+//		{
+//			xrExtensions.push_back( XR_KHR_OPENGL_ENABLE_EXTENSION_NAME );
+//		}
+//		break;
 //#endif
 //
 //
 //#if VULKAN_SUPPORTED
-//        case RENDER_DEVICE_TYPE_VULKAN:
-//        {
-//            xrExtensions.push_back( XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME );
-//        }
-//        break;
+//		case RENDER_DEVICE_TYPE_VULKAN:
+//		{
+//			xrExtensions.push_back( XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME );
+//		}
+//		break;
 //#endif
-//        }
+//		}
 
-        if ( xrExtensions.empty() )
-        {
-            // we can't create an instance without at least a graphics extension
-            return false;
-        }
+		if ( xrExtensions.empty() )
+		{
+			// we can't create an instance without at least a graphics extension
+			return false;
+		}
 
-        // CODE GOES HERE: Add any additional extensions required by your application
+		// CODE GOES HERE: Add any additional extensions required by your application
 
-        std::vector<const char*> extensionPointers;
-        for ( auto& ext : xrExtensions )
-        {
-            extensionPointers.push_back( ext.c_str() );
-        }
+		std::vector<const char*> extensionPointers;
+		for ( auto& ext : xrExtensions )
+		{
+			extensionPointers.push_back( ext.c_str() );
+		}
 
-        XrInstanceCreateInfo createInfo = { XR_TYPE_INSTANCE_CREATE_INFO };
-        createInfo.enabledExtensionCount = (uint32_t)extensionPointers.size();
-        createInfo.enabledExtensionNames = &extensionPointers[ 0 ];
-        strcpy_s( createInfo.applicationInfo.applicationName, "Hello Diligent XR" );
-        createInfo.applicationInfo.applicationVersion = 1;
-        strcpy_s( createInfo.applicationInfo.engineName, "DiligentEngine" );
-        createInfo.applicationInfo.engineVersion = DILIGENT_API_VERSION;
-        createInfo.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
+		XrInstanceCreateInfo createInfo = { XR_TYPE_INSTANCE_CREATE_INFO };
+		createInfo.enabledExtensionCount = (uint32_t)extensionPointers.size();
+		createInfo.enabledExtensionNames = &extensionPointers[ 0 ];
+		strcpy_s( createInfo.applicationInfo.applicationName, "Hello Diligent XR" );
+		createInfo.applicationInfo.applicationVersion = 1;
+		strcpy_s( createInfo.applicationInfo.engineName, "DiligentEngine" );
+		createInfo.applicationInfo.engineVersion = DILIGENT_API_VERSION;
+		createInfo.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
 
-        XrResult res = xrCreateInstance( &createInfo, &m_instance );
-        if ( XR_FAILED( res ) )
-        {
-            return false;
-        }
+		XrResult res = xrCreateInstance( &createInfo, &m_instance );
+		if ( XR_FAILED( res ) )
+		{
+			return false;
+		}
 
-        XrSystemGetInfo getInfo = { XR_TYPE_SYSTEM_GET_INFO };
-        getInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
-        res = xrGetSystem( m_instance, &getInfo, &m_systemId );
+		XrSystemGetInfo getInfo = { XR_TYPE_SYSTEM_GET_INFO };
+		getInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
+		res = xrGetSystem( m_instance, &getInfo, &m_systemId );
 
-        if ( XR_FAILED( res ) )
-        {
-            return false;
-        }
+		if ( XR_FAILED( res ) )
+		{
+			return false;
+		}
 
-        m_views[ 0 ].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
+		m_views[ 0 ].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
 		m_views[ 1 ].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
 
-        uint32_t viewCountOutput = 0;
-        if ( XR_FAILED( xrEnumerateViewConfigurationViews( m_instance, m_systemId, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
-            2, &viewCountOutput, m_views ) ) )
-        {
-            return false;
-        }
+		uint32_t viewCountOutput = 0;
+		if ( XR_FAILED( xrEnumerateViewConfigurationViews( m_instance, m_systemId, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO,
+			2, &viewCountOutput, m_views ) ) )
+		{
+			return false;
+		}
 
-        return XR_SUCCEEDED( res );
-    }
+		return XR_SUCCEEDED( res );
+	}
 
-    bool CreateSession()
-    {
-        XrSessionCreateInfo createInfo = { XR_TYPE_SESSION_CREATE_INFO };
-        createInfo.systemId = m_systemId;
-        createInfo.createFlags = 0;
+	bool CreateSession()
+	{
+		XrSessionCreateInfo createInfo = { XR_TYPE_SESSION_CREATE_INFO };
+		createInfo.systemId = m_systemId;
+		createInfo.createFlags = 0;
 
-        std::vector< int64_t > requestedFormats = m_pGraphicsBinding->GetRequestedColorFormats();
-        std::vector< int64_t > requestedDepthFormats = m_pGraphicsBinding->GetRequestedDepthFormats();
-        createInfo.next = m_pGraphicsBinding->GetSessionBinding();
-        CHECK_XR_RESULT( xrCreateSession( m_instance, &createInfo, &m_session ) );
+		std::vector< int64_t > requestedFormats = m_pGraphicsBinding->GetRequestedColorFormats();
+		std::vector< int64_t > requestedDepthFormats = m_pGraphicsBinding->GetRequestedDepthFormats();
+		createInfo.next = m_pGraphicsBinding->GetSessionBinding();
+		CHECK_XR_RESULT( xrCreateSession( m_instance, &createInfo, &m_session ) );
 
-        uint32_t swapchainFormatCount;
-        CHECK_XR_RESULT( xrEnumerateSwapchainFormats( m_session, 0, &swapchainFormatCount, nullptr ) );
-        std::vector<int64_t> supportedFormats;
-        supportedFormats.resize( swapchainFormatCount );
+		uint32_t swapchainFormatCount;
+		CHECK_XR_RESULT( xrEnumerateSwapchainFormats( m_session, 0, &swapchainFormatCount, nullptr ) );
+		std::vector<int64_t> supportedFormats;
+		supportedFormats.resize( swapchainFormatCount );
 		CHECK_XR_RESULT( xrEnumerateSwapchainFormats( m_session, swapchainFormatCount, &swapchainFormatCount, &supportedFormats[0] ) );
-        if ( requestedFormats.empty() || supportedFormats.empty() )
-            return false;
+		if ( requestedFormats.empty() || supportedFormats.empty() )
+			return false;
 
 		XrSwapchainCreateInfo scCreateInfo = { XR_TYPE_SWAPCHAIN_CREATE_INFO };
 		scCreateInfo.arraySize = 2;
@@ -435,22 +435,22 @@ public:
 		depthCreateInfo.width = m_views[ 0 ].recommendedImageRectWidth;
 		depthCreateInfo.height = m_views[ 0 ].recommendedImageRectHeight;
 		depthCreateInfo.createFlags = 0;
-        depthCreateInfo.usageFlags = XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+		depthCreateInfo.usageFlags = XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 		depthCreateInfo.format = requestedDepthFormats[ 0 ];
 		depthCreateInfo.mipCount = 1;
 		depthCreateInfo.sampleCount = 1;
 		depthCreateInfo.faceCount = 1;
 
-        // find the format on our list that's earliest on the runtime's list
-        for ( int64_t supported : supportedFormats )
-        {
-            if ( std::find( requestedFormats.begin(), requestedFormats.end(), supported )
-                != requestedFormats.end() )
-            {
-                scCreateInfo.format = supported;
-                break;
-            }
-        }
+		// find the format on our list that's earliest on the runtime's list
+		for ( int64_t supported : supportedFormats )
+		{
+			if ( std::find( requestedFormats.begin(), requestedFormats.end(), supported )
+				!= requestedFormats.end() )
+			{
+				scCreateInfo.format = supported;
+				break;
+			}
+		}
 		for ( int64_t supported : supportedFormats )
 		{
 			if ( std::find( requestedDepthFormats.begin(), requestedDepthFormats.end(), supported )
@@ -461,14 +461,14 @@ public:
 			}
 		}
 
-        CHECK_XR_RESULT( xrCreateSwapchain( m_session, &scCreateInfo, &m_swapchain ) );
+		CHECK_XR_RESULT( xrCreateSwapchain( m_session, &scCreateInfo, &m_swapchain ) );
 		CHECK_XR_RESULT( xrCreateSwapchain( m_session, &depthCreateInfo, &m_depthSwapchain ) );
 
-        uint32_t imageCount, depthImageCount;
-        CHECK_XR_RESULT( xrEnumerateSwapchainImages( m_swapchain, 0, &imageCount, nullptr ) );
+		uint32_t imageCount, depthImageCount;
+		CHECK_XR_RESULT( xrEnumerateSwapchainImages( m_swapchain, 0, &imageCount, nullptr ) );
 		CHECK_XR_RESULT( xrEnumerateSwapchainImages( m_depthSwapchain, 0, &depthImageCount, nullptr ) );
 
-        std::vector< RefCntAutoPtr<ITexture> > textures = m_pGraphicsBinding->ReadImagesFromSwapchain( m_swapchain );
+		std::vector< RefCntAutoPtr<ITexture> > textures = m_pGraphicsBinding->ReadImagesFromSwapchain( m_swapchain );
 		for ( RefCntAutoPtr<ITexture> & pTexture: textures )
 		{
 			TextureViewDesc viewDesc;
@@ -503,182 +503,182 @@ public:
 			viewDesc.FirstArraySlice = 1;
 			RefCntAutoPtr< ITextureView > pRightEyeView;
 			pTexture->CreateView( viewDesc, &pRightEyeView );
-            m_rpEyeDepthViews[ 1 ].push_back( pRightEyeView );
+			m_rpEyeDepthViews[ 1 ].push_back( pRightEyeView );
 		}
 
 		XrReferenceSpaceCreateInfo spaceCreateInfo = { XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
 		spaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
-        spaceCreateInfo.poseInReferenceSpace = IdentityXrPose();
+		spaceCreateInfo.poseInReferenceSpace = IdentityXrPose();
 		CHECK_XR_RESULT( xrCreateReferenceSpace( m_session, &spaceCreateInfo, &m_stageSpace ) );
 
-        return true;
-    }
+		return true;
+	}
 
 
-    bool ProcessCommandLine(const char* CmdLine)
-    {
-        const auto* Key = "-mode ";
-        const auto* pos = strstr(CmdLine, Key);
-        if (pos != nullptr)
-        {
-            pos += strlen(Key);
-            if (_stricmp(pos, "D3D11") == 0)
-            {
+	bool ProcessCommandLine(const char* CmdLine)
+	{
+		const auto* Key = "-mode ";
+		const auto* pos = strstr(CmdLine, Key);
+		if (pos != nullptr)
+		{
+			pos += strlen(Key);
+			if (_stricmp(pos, "D3D11") == 0)
+			{
 #if D3D11_SUPPORTED
-                m_DeviceType = RENDER_DEVICE_TYPE_D3D11;
+				m_DeviceType = RENDER_DEVICE_TYPE_D3D11;
 #else
-                std::cerr << "Direct3D11 is not supported. Please select another device type";
-                return false;
+				std::cerr << "Direct3D11 is not supported. Please select another device type";
+				return false;
 #endif
-            }
-            else if (_stricmp(pos, "D3D12") == 0)
-            {
+			}
+			else if (_stricmp(pos, "D3D12") == 0)
+			{
 #if D3D12_SUPPORTED
-                m_DeviceType = RENDER_DEVICE_TYPE_D3D12;
+				m_DeviceType = RENDER_DEVICE_TYPE_D3D12;
 #else
-                std::cerr << "Direct3D12 is not supported. Please select another device type";
-                return false;
+				std::cerr << "Direct3D12 is not supported. Please select another device type";
+				return false;
 #endif
-            }
-            else if (_stricmp(pos, "GL") == 0)
-            {
+			}
+			else if (_stricmp(pos, "GL") == 0)
+			{
 #if GL_SUPPORTED
-                m_DeviceType = RENDER_DEVICE_TYPE_GL;
+				m_DeviceType = RENDER_DEVICE_TYPE_GL;
 #else
-                std::cerr << "OpenGL is not supported. Please select another device type";
-                return false;
+				std::cerr << "OpenGL is not supported. Please select another device type";
+				return false;
 #endif
-            }
-            else if (_stricmp(pos, "VK") == 0)
-            {
+			}
+			else if (_stricmp(pos, "VK") == 0)
+			{
 #if VULKAN_SUPPORTED
-                m_DeviceType = RENDER_DEVICE_TYPE_VULKAN;
+				m_DeviceType = RENDER_DEVICE_TYPE_VULKAN;
 #else
-                std::cerr << "Vulkan is not supported. Please select another device type";
-                return false;
+				std::cerr << "Vulkan is not supported. Please select another device type";
+				return false;
 #endif
-            }
-            else
-            {
-                std::cerr << "Unknown device type. Only the following types are supported: D3D11, D3D12, GL, VK";
-                return false;
-            }
-        }
-        else
-        {
+			}
+			else
+			{
+				std::cerr << "Unknown device type. Only the following types are supported: D3D11, D3D12, GL, VK";
+				return false;
+			}
+		}
+		else
+		{
 #if D3D12_SUPPORTED
-            m_DeviceType = RENDER_DEVICE_TYPE_D3D12;
+			m_DeviceType = RENDER_DEVICE_TYPE_D3D12;
 #elif VULKAN_SUPPORTED
-            m_DeviceType = RENDER_DEVICE_TYPE_VULKAN;
+			m_DeviceType = RENDER_DEVICE_TYPE_VULKAN;
 #elif D3D11_SUPPORTED
-            m_DeviceType = RENDER_DEVICE_TYPE_D3D11;
+			m_DeviceType = RENDER_DEVICE_TYPE_D3D11;
 #elif GL_SUPPORTED
-            m_DeviceType = RENDER_DEVICE_TYPE_GL;
+			m_DeviceType = RENDER_DEVICE_TYPE_GL;
 #endif
-        }
-        return true;
-    }
+		}
+		return true;
+	}
 
 
 #if D3D11_SUPPORTED
-    IRenderDeviceD3D11* GetD3D11Device() { return (IRenderDeviceD3D11 *)m_pGraphicsBinding->GetRenderDevice(); }
+	IRenderDeviceD3D11* GetD3D11Device() { return (IRenderDeviceD3D11 *)m_pGraphicsBinding->GetRenderDevice(); }
 #endif
 
 #if D3D12_SUPPORTED
 	IRenderDeviceD3D12* GetD3D12Device() { return (IRenderDeviceD3D12*)m_pGraphicsBinding->GetRenderDevice(); }
 #endif
 
-    void Render();
-    void Update( double currTime, double elapsedTime );
+	void Render();
+	void Update( double currTime, double elapsedTime );
 
-    void Present()
-    {
-        m_pSwapChain->Present();
-    }
+	void Present()
+	{
+		m_pSwapChain->Present();
+	}
 
-    void WindowResize(Uint32 Width, Uint32 Height)
-    {
-        if (m_pSwapChain)
-            m_pSwapChain->Resize(Width, Height);
-    }
+	void WindowResize(Uint32 Width, Uint32 Height)
+	{
+		if (m_pSwapChain)
+			m_pSwapChain->Resize(Width, Height);
+	}
 
-    RENDER_DEVICE_TYPE GetDeviceType() const { return m_DeviceType; }
+	RENDER_DEVICE_TYPE GetDeviceType() const { return m_DeviceType; }
 
 	void CreatePipelineState();
 	void CreateVertexBuffer();
 	void CreateIndexBuffer();
 
-    void ProcessOpenXrEvents();
-    bool ShouldRender() const 
-    { 
-        return m_sessionState == XR_SESSION_STATE_VISIBLE
-            || m_sessionState == XR_SESSION_STATE_FOCUSED;
-    }
+	void ProcessOpenXrEvents();
+	bool ShouldRender() const 
+	{ 
+		return m_sessionState == XR_SESSION_STATE_VISIBLE
+			|| m_sessionState == XR_SESSION_STATE_FOCUSED;
+	}
 	bool ShouldWait() const
 	{
 		return m_sessionState == XR_SESSION_STATE_READY
-            || m_sessionState == XR_SESSION_STATE_SYNCHRONIZED
-            || m_sessionState == XR_SESSION_STATE_VISIBLE
+			|| m_sessionState == XR_SESSION_STATE_SYNCHRONIZED
+			|| m_sessionState == XR_SESSION_STATE_VISIBLE
 			|| m_sessionState == XR_SESSION_STATE_FOCUSED;
 	}
 
-    bool RunXrFrame();
-    bool RenderEye( const XrView& view, ITextureView *eyeBuffer, ITextureView* depthBuffer );
+	bool RunXrFrame();
+	bool RenderEye( const XrView& view, ITextureView *eyeBuffer, ITextureView* depthBuffer );
 
 private:
-	RefCntAutoPtr<IPipelineState>         m_pPSO;
+	RefCntAutoPtr<IPipelineState>		 m_pPSO;
 	RefCntAutoPtr<IShaderResourceBinding> m_pSRB;
-	RefCntAutoPtr<IBuffer>                m_CubeVertexBuffer;
-	RefCntAutoPtr<IBuffer>                m_CubeIndexBuffer;
-	RefCntAutoPtr<IBuffer>                m_VSConstants;
-	float4x4                              m_CubeToWorld;
-	float4x4                              m_ViewToProj;
+	RefCntAutoPtr<IBuffer>				m_CubeVertexBuffer;
+	RefCntAutoPtr<IBuffer>				m_CubeIndexBuffer;
+	RefCntAutoPtr<IBuffer>				m_VSConstants;
+	float4x4							  m_CubeToWorld;
+	float4x4							  m_ViewToProj;
 
-    RefCntAutoPtr<ISwapChain>     m_pSwapChain;
+	RefCntAutoPtr<ISwapChain>	 m_pSwapChain;
 	std::vector< RefCntAutoPtr<ITextureView> >  m_rpEyeSwapchainViews[2];
 	std::vector< RefCntAutoPtr<ITextureView> >  m_rpEyeDepthViews[ 2 ];
-    RENDER_DEVICE_TYPE            m_DeviceType = RENDER_DEVICE_TYPE_D3D11;
-    std::unique_ptr<IGraphicsBinding> m_pGraphicsBinding;
+	RENDER_DEVICE_TYPE			m_DeviceType = RENDER_DEVICE_TYPE_D3D11;
+	std::unique_ptr<IGraphicsBinding> m_pGraphicsBinding;
 
-    XrInstance m_instance = XR_NULL_HANDLE;
-    XrSystemId m_systemId = XR_NULL_SYSTEM_ID;
-    XrSession m_session = XR_NULL_HANDLE;
-    XrViewConfigurationView m_views[ 2 ] = {};
-    XrSwapchain m_swapchain = XR_NULL_HANDLE;
+	XrInstance m_instance = XR_NULL_HANDLE;
+	XrSystemId m_systemId = XR_NULL_SYSTEM_ID;
+	XrSession m_session = XR_NULL_HANDLE;
+	XrViewConfigurationView m_views[ 2 ] = {};
+	XrSwapchain m_swapchain = XR_NULL_HANDLE;
 	XrSwapchain m_depthSwapchain = XR_NULL_HANDLE;
-    XrSpace m_stageSpace = XR_NULL_HANDLE;
-    XrSessionState m_sessionState = XR_SESSION_STATE_UNKNOWN;
+	XrSpace m_stageSpace = XR_NULL_HANDLE;
+	XrSessionState m_sessionState = XR_SESSION_STATE_UNKNOWN;
 };
 
 void HelloXrApp::ProcessOpenXrEvents()
 {
-    while ( true )
-    {
-        XrEventDataBuffer eventData = { XR_TYPE_EVENT_DATA_BUFFER };
-        XrResult res = xrPollEvent( m_instance, &eventData );
-        if ( res == XR_EVENT_UNAVAILABLE )
-            break;
+	while ( true )
+	{
+		XrEventDataBuffer eventData = { XR_TYPE_EVENT_DATA_BUFFER };
+		XrResult res = xrPollEvent( m_instance, &eventData );
+		if ( res == XR_EVENT_UNAVAILABLE )
+			break;
 
-        if ( XR_FAILED( res ) )
-        {
-            // log something?
-            break;
-        }
+		if ( XR_FAILED( res ) )
+		{
+			// log something?
+			break;
+		}
 
-        switch ( eventData.type )
-        {
-            case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED:
-            {
-                const XrEventDataSessionStateChanged* event = ( const XrEventDataSessionStateChanged* )( &eventData );
-                switch ( event->state )
-                {
-                    case XR_SESSION_STATE_READY:
-                    {
-                        XrSessionBeginInfo beginInfo = { XR_TYPE_SESSION_BEGIN_INFO };
-                        beginInfo.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-                        xrBeginSession( m_session, &beginInfo );
-                    }
-                    break;
+		switch ( eventData.type )
+		{
+			case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED:
+			{
+				const XrEventDataSessionStateChanged* event = ( const XrEventDataSessionStateChanged* )( &eventData );
+				switch ( event->state )
+				{
+					case XR_SESSION_STATE_READY:
+					{
+						XrSessionBeginInfo beginInfo = { XR_TYPE_SESSION_BEGIN_INFO };
+						beginInfo.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+						xrBeginSession( m_session, &beginInfo );
+					}
+					break;
 
 					case XR_SESSION_STATE_STOPPING:
 					{
@@ -686,46 +686,46 @@ void HelloXrApp::ProcessOpenXrEvents()
 					}
 					break;
 
-                    default:
-                        // nothing special to do for this session state
-                        break;
-                }
+					default:
+						// nothing special to do for this session state
+						break;
+				}
 
-                m_sessionState = event->state;
-            }
-            break;
+				m_sessionState = event->state;
+			}
+			break;
 
-            default:
-                // ignoring this event
-                break;
-        }
-    }
+			default:
+				// ignoring this event
+				break;
+		}
+	}
 }
 
 bool HelloXrApp::RunXrFrame()
 {
 	ProcessOpenXrEvents();
 
-    if ( !ShouldWait() )
-        return true;
+	if ( !ShouldWait() )
+		return true;
 
-    XrFrameState frameState = { XR_TYPE_FRAME_STATE };
-    XrFrameWaitInfo waitInfo = { XR_TYPE_FRAME_WAIT_INFO };
-    CHECK_XR_RESULT( xrWaitFrame( m_session, &waitInfo, &frameState ) );
+	XrFrameState frameState = { XR_TYPE_FRAME_STATE };
+	XrFrameWaitInfo waitInfo = { XR_TYPE_FRAME_WAIT_INFO };
+	CHECK_XR_RESULT( xrWaitFrame( m_session, &waitInfo, &frameState ) );
 
-    XrFrameBeginInfo beginInfo = { XR_TYPE_FRAME_BEGIN_INFO };
-    CHECK_XR_RESULT( xrBeginFrame( m_session, &beginInfo ) );
+	XrFrameBeginInfo beginInfo = { XR_TYPE_FRAME_BEGIN_INFO };
+	CHECK_XR_RESULT( xrBeginFrame( m_session, &beginInfo ) );
 
 	XrFrameEndInfo frameEndInfo = { XR_TYPE_FRAME_END_INFO };
 	frameEndInfo.displayTime = frameState.predictedDisplayTime;
 	frameEndInfo.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
 
 	XrCompositionLayerProjectionView projectionViews[ 2 ] = { { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW }, { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW } };
-    XrCompositionLayerProjection projectionLayer = { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
-    XrCompositionLayerBaseHeader *layers[] = { (XrCompositionLayerBaseHeader*) &projectionLayer };
+	XrCompositionLayerProjection projectionLayer = { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
+	XrCompositionLayerBaseHeader *layers[] = { (XrCompositionLayerBaseHeader*) &projectionLayer };
 
-    if ( frameState.shouldRender && ShouldRender() )
-    {
+	if ( frameState.shouldRender && ShouldRender() )
+	{
 		// acquire the image index for this swapchain
 		XrSwapchainImageAcquireInfo acquireInfo = { XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
 		uint32_t index;
@@ -750,37 +750,37 @@ bool HelloXrApp::RunXrFrame()
 		RenderEye( views[ 0 ], m_rpEyeSwapchainViews[ 0 ][ index ], m_rpEyeDepthViews[ 0 ][ index ] );
 		RenderEye( views[ 1 ], m_rpEyeSwapchainViews[ 1 ][ index ], m_rpEyeDepthViews[ 1 ][ index ] );
 
-        // release the image we just rendered into
-        XrSwapchainImageReleaseInfo releaseInfo = { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
-        CHECK_XR_RESULT( xrReleaseSwapchainImage( m_swapchain, &releaseInfo ) );
+		// release the image we just rendered into
+		XrSwapchainImageReleaseInfo releaseInfo = { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
+		CHECK_XR_RESULT( xrReleaseSwapchainImage( m_swapchain, &releaseInfo ) );
 
-        for ( uint32_t i = 0; i < 2; i++ )
-        {
-            projectionViews[ i ].fov = views[ i ].fov;
+		for ( uint32_t i = 0; i < 2; i++ )
+		{
+			projectionViews[ i ].fov = views[ i ].fov;
 			projectionViews[ i ].pose = views[ i ].pose;
-            projectionViews[ i ].subImage.swapchain = m_swapchain;
+			projectionViews[ i ].subImage.swapchain = m_swapchain;
 			projectionViews[ i ].subImage.imageArrayIndex = i;
-            projectionViews[ i ].subImage.imageRect =
-                { 
-                    { 0, 0 }, 
-                    { 
-                        (int32_t)m_views[ 0 ].recommendedImageRectWidth, 
-                        (int32_t)m_views[ 0 ].recommendedImageRectHeight 
-                    } 
-                };
-        }
+			projectionViews[ i ].subImage.imageRect =
+				{ 
+					{ 0, 0 }, 
+					{ 
+						(int32_t)m_views[ 0 ].recommendedImageRectWidth, 
+						(int32_t)m_views[ 0 ].recommendedImageRectHeight 
+					} 
+				};
+		}
 
-        projectionLayer.space = m_stageSpace;
-        projectionLayer.viewCount = 2;
-        projectionLayer.views = projectionViews;
+		projectionLayer.space = m_stageSpace;
+		projectionLayer.viewCount = 2;
+		projectionLayer.views = projectionViews;
 
-        frameEndInfo.layers = layers;
-        frameEndInfo.layerCount = 1;
-    }
+		frameEndInfo.layers = layers;
+		frameEndInfo.layerCount = 1;
+	}
 
-    CHECK_XR_RESULT( xrEndFrame( m_session, &frameEndInfo ) );
+	CHECK_XR_RESULT( xrEndFrame( m_session, &frameEndInfo ) );
 
-    return true;
+	return true;
 }
 
 
@@ -792,14 +792,14 @@ bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextu
 	m_pGraphicsBinding->GetImmediateContext()->ClearRenderTarget( eyeBuffer, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 	m_pGraphicsBinding->GetImmediateContext()->ClearDepthStencil( depthBuffer, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 
-    float4x4 eyeToProj;
-    float4x4_CreateProjection( &eyeToProj, m_DeviceType, view.fov, 0.01f, 10.f );
+	float4x4 eyeToProj;
+	float4x4_CreateProjection( &eyeToProj, m_DeviceType, view.fov, 0.01f, 10.f );
 
-    m_ViewToProj = eyeToProj;
+	m_ViewToProj = eyeToProj;
 
-    float4x4 eyeToStage = 
-        quaternionFromXrQuaternion( view.pose.orientation ).ToMatrix() * float4x4::Translation( vectorFromXrVector( view.pose.position ) );
-    float4x4 stageToEye = eyeToStage.Inverse();
+	float4x4 eyeToStage = 
+		quaternionFromXrQuaternion( view.pose.orientation ).ToMatrix() * float4x4::Translation( vectorFromXrVector( view.pose.position ) );
+	float4x4 stageToEye = eyeToStage.Inverse();
 
 	{
 		// Map the buffer and write current world-view-projection matrix
@@ -819,14 +819,14 @@ bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextu
 	// makes sure that resources are transitioned to required states.
 	m_pGraphicsBinding->GetImmediateContext()->CommitShaderResources( m_pSRB, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 
-	DrawIndexedAttribs DrawAttrs;     // This is an indexed draw call
+	DrawIndexedAttribs DrawAttrs;	 // This is an indexed draw call
 	DrawAttrs.IndexType = VT_UINT32; // Index type
 	DrawAttrs.NumIndices = 36;
 	// Verify the state of vertex and index buffers
 	DrawAttrs.Flags = DRAW_FLAG_VERIFY_ALL;
 	m_pGraphicsBinding->GetImmediateContext()->DrawIndexed( DrawAttrs );
 
-    return true;
+	return true;
 }
 
 
@@ -854,7 +854,7 @@ void HelloXrApp::CreatePipelineState()
 	PSOCreateInfo.GraphicsPipeline.PrimitiveTopology = PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	// Cull back faces
 	PSOCreateInfo.GraphicsPipeline.RasterizerDesc.CullMode = CULL_MODE_BACK;
-    PSOCreateInfo.GraphicsPipeline.RasterizerDesc.FrontCounterClockwise = true;
+	PSOCreateInfo.GraphicsPipeline.RasterizerDesc.FrontCounterClockwise = true;
 	// Enable depth testing
 	PSOCreateInfo.GraphicsPipeline.DepthStencilDesc.DepthEnable = True;
 	// clang-format on
@@ -942,19 +942,19 @@ void HelloXrApp::CreateVertexBuffer()
 
 	// Cube vertices
 
-	//      (-1,+1,+1)________________(+1,+1,+1)
-	//               /|              /|
-	//              / |             / |
-	//             /  |            /  |
-	//            /   |           /   |
+	//	  (-1,+1,+1)________________(+1,+1,+1)
+	//			   /|			  /|
+	//			  / |			 / |
+	//			 /  |			/  |
+	//			/   |		   /   |
 	//(-1,-1,+1) /____|__________/(+1,-1,+1)
-	//           |    |__________|____|
-	//           |   /(-1,+1,-1) |    /(+1,+1,-1)
-	//           |  /            |   /
-	//           | /             |  /
-	//           |/              | /
-	//           /_______________|/
-	//        (-1,-1,-1)       (+1,-1,-1)
+	//		   |	|__________|____|
+	//		   |   /(-1,+1,-1) |	/(+1,+1,-1)
+	//		   |  /			|   /
+	//		   | /			 |  /
+	//		   |/			  | /
+	//		   /_______________|/
+	//		(-1,-1,-1)	   (+1,-1,-1)
 	//
 
 	// clang-format off
@@ -1016,11 +1016,11 @@ void HelloXrApp::Render()
 	auto* pDSV = m_pSwapChain->GetDepthBufferDSV();
 	// Clear the back buffer
 	const float ClearColor[] = { 0.350f, 0.350f, 0.350f, 1.0f };
-    m_pGraphicsBinding->GetImmediateContext()->SetRenderTargets( 1, &pRTV, pDSV, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+	m_pGraphicsBinding->GetImmediateContext()->SetRenderTargets( 1, &pRTV, pDSV, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 	m_pGraphicsBinding->GetImmediateContext()->ClearRenderTarget( pRTV, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 	m_pGraphicsBinding->GetImmediateContext()->ClearDepthStencil( pDSV, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 
-    float4x4 stageToDesktopView = float4x4::Translation( 0.f, 0.0f, -2.5f );
+	float4x4 stageToDesktopView = float4x4::Translation( 0.f, 0.0f, -2.5f );
 	{
 		// Map the buffer and write current world-view-projection matrix
 		MapHelper<float4x4> CBConstants( m_pGraphicsBinding->GetImmediateContext(), m_VSConstants, MAP_WRITE, MAP_FLAG_DISCARD );
@@ -1039,7 +1039,7 @@ void HelloXrApp::Render()
 	// makes sure that resources are transitioned to required states.
 	m_pGraphicsBinding->GetImmediateContext()->CommitShaderResources( m_pSRB, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 
-	DrawIndexedAttribs DrawAttrs;     // This is an indexed draw call
+	DrawIndexedAttribs DrawAttrs;	 // This is an indexed draw call
 	DrawAttrs.IndexType = VT_UINT32; // Index type
 	DrawAttrs.NumIndices = 36;
 	// Verify the state of vertex and index buffers
@@ -1051,9 +1051,9 @@ void HelloXrApp::Render()
 void HelloXrApp::Update( double CurrTime, double ElapsedTime )
 {
 	// Apply rotation
-    m_CubeToWorld = float4x4::Scale( 0.5f ) 
-        * float4x4::RotationY( static_cast<float>( CurrTime ) * 1.0f ) 
-        * float4x4::RotationX( -PI_F * 0.1f );
+	m_CubeToWorld = float4x4::Scale( 0.5f ) 
+		* float4x4::RotationY( static_cast<float>( CurrTime ) * 1.0f ) 
+		* float4x4::RotationX( -PI_F * 0.1f );
 }
 
 
@@ -1064,119 +1064,119 @@ LRESULT CALLBACK MessageProc(HWND, UINT, WPARAM, LPARAM);
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int cmdShow)
 {
 #if defined(_DEBUG) || defined(DEBUG)
-    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
 
-    g_pTheApp.reset(new HelloXrApp);
+	g_pTheApp.reset(new HelloXrApp);
 
-    const auto* cmdLine = GetCommandLineA();
-    if (!g_pTheApp->ProcessCommandLine(cmdLine))
-        return -1;
+	const auto* cmdLine = GetCommandLineA();
+	if (!g_pTheApp->ProcessCommandLine(cmdLine))
+		return -1;
 
-    std::wstring Title(L"Tutorial00: Hello Win32");
-    switch (g_pTheApp->GetDeviceType())
-    {
-        case RENDER_DEVICE_TYPE_D3D11: Title.append(L" (D3D11)"); break;
-        case RENDER_DEVICE_TYPE_D3D12: Title.append(L" (D3D12)"); break;
-        case RENDER_DEVICE_TYPE_GL: Title.append(L" (GL)"); break;
-        case RENDER_DEVICE_TYPE_VULKAN: Title.append(L" (VK)"); break;
-    }
-    // Register our window class
-    WNDCLASSEX wcex = {sizeof(WNDCLASSEX), CS_HREDRAW | CS_VREDRAW, MessageProc,
-                       0L, 0L, instance, NULL, NULL, NULL, NULL, L"SampleApp", NULL};
-    RegisterClassEx(&wcex);
+	std::wstring Title(L"Tutorial00: Hello Win32");
+	switch (g_pTheApp->GetDeviceType())
+	{
+		case RENDER_DEVICE_TYPE_D3D11: Title.append(L" (D3D11)"); break;
+		case RENDER_DEVICE_TYPE_D3D12: Title.append(L" (D3D12)"); break;
+		case RENDER_DEVICE_TYPE_GL: Title.append(L" (GL)"); break;
+		case RENDER_DEVICE_TYPE_VULKAN: Title.append(L" (VK)"); break;
+	}
+	// Register our window class
+	WNDCLASSEX wcex = {sizeof(WNDCLASSEX), CS_HREDRAW | CS_VREDRAW, MessageProc,
+					   0L, 0L, instance, NULL, NULL, NULL, NULL, L"SampleApp", NULL};
+	RegisterClassEx(&wcex);
 
-    // Create a window
-    LONG WindowWidth  = 1280;
-    LONG WindowHeight = 1024;
-    RECT rc           = {0, 0, WindowWidth, WindowHeight};
-    AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
-    HWND wnd = CreateWindow(L"SampleApp", Title.c_str(),
-                            WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
-                            rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, instance, NULL);
-    if (!wnd)
-    {
-        MessageBox(NULL, L"Cannot create window", L"Error", MB_OK | MB_ICONERROR);
-        return 0;
-    }
-    ShowWindow(wnd, cmdShow);
-    UpdateWindow(wnd);
+	// Create a window
+	LONG WindowWidth  = 1280;
+	LONG WindowHeight = 1024;
+	RECT rc		   = {0, 0, WindowWidth, WindowHeight};
+	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+	HWND wnd = CreateWindow(L"SampleApp", Title.c_str(),
+							WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+							rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, instance, NULL);
+	if (!wnd)
+	{
+		MessageBox(NULL, L"Cannot create window", L"Error", MB_OK | MB_ICONERROR);
+		return 0;
+	}
+	ShowWindow(wnd, cmdShow);
+	UpdateWindow(wnd);
 
-    if (!g_pTheApp->Initialize(wnd))
-        return -1;
+	if (!g_pTheApp->Initialize(wnd))
+		return -1;
 
 	Diligent::Timer Timer;
 
 	auto   PrevTime = Timer.GetElapsedTime();
 
-    // Main message loop
-    MSG msg = {0};
-    while (WM_QUIT != msg.message)
-    {
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-        {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-        else
-        {
-            g_pTheApp->RunXrFrame();
+	// Main message loop
+	MSG msg = {0};
+	while (WM_QUIT != msg.message)
+	{
+		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+		else
+		{
+			g_pTheApp->RunXrFrame();
 
-            auto CurrTime = Timer.GetElapsedTime();
+			auto CurrTime = Timer.GetElapsedTime();
 			auto ElapsedTime = CurrTime - PrevTime;
 			PrevTime = CurrTime;
-            g_pTheApp->Update( CurrTime, ElapsedTime );
+			g_pTheApp->Update( CurrTime, ElapsedTime );
 
-            g_pTheApp->Render();
-            g_pTheApp->Present();
-        }
-    }
+			g_pTheApp->Render();
+			g_pTheApp->Present();
+		}
+	}
 
-    g_pTheApp.reset();
+	g_pTheApp.reset();
 
-    return (int)msg.wParam;
+	return (int)msg.wParam;
 }
 
 // Called every time the NativeNativeAppBase receives a message
 LRESULT CALLBACK MessageProc(HWND wnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    switch (message)
-    {
-        case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            BeginPaint(wnd, &ps);
-            EndPaint(wnd, &ps);
-            return 0;
-        }
-        case WM_SIZE: // Window size has been changed
-            if (g_pTheApp)
-            {
-                g_pTheApp->WindowResize(LOWORD(lParam), HIWORD(lParam));
-            }
-            return 0;
+	switch (message)
+	{
+		case WM_PAINT:
+		{
+			PAINTSTRUCT ps;
+			BeginPaint(wnd, &ps);
+			EndPaint(wnd, &ps);
+			return 0;
+		}
+		case WM_SIZE: // Window size has been changed
+			if (g_pTheApp)
+			{
+				g_pTheApp->WindowResize(LOWORD(lParam), HIWORD(lParam));
+			}
+			return 0;
 
-        case WM_CHAR:
-            if (wParam == VK_ESCAPE)
-                PostQuitMessage(0);
-            return 0;
+		case WM_CHAR:
+			if (wParam == VK_ESCAPE)
+				PostQuitMessage(0);
+			return 0;
 
-        case WM_DESTROY:
-            PostQuitMessage(0);
-            return 0;
+		case WM_DESTROY:
+			PostQuitMessage(0);
+			return 0;
 
-        case WM_GETMINMAXINFO:
-        {
-            LPMINMAXINFO lpMMI = (LPMINMAXINFO)lParam;
+		case WM_GETMINMAXINFO:
+		{
+			LPMINMAXINFO lpMMI = (LPMINMAXINFO)lParam;
 
-            lpMMI->ptMinTrackSize.x = 320;
-            lpMMI->ptMinTrackSize.y = 240;
-            return 0;
-        }
+			lpMMI->ptMinTrackSize.x = 320;
+			lpMMI->ptMinTrackSize.y = 240;
+			return 0;
+		}
 
-        default:
-            return DefWindowProc(wnd, message, wParam, lParam);
-    }
+		default:
+			return DefWindowProc(wnd, message, wParam, lParam);
+	}
 }
 
 // TODO:

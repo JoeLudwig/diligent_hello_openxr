@@ -1,7 +1,7 @@
 
 #if D3D11_SUPPORTED
 #include <d3d11.h>
-#    define XR_USE_GRAPHICS_API_D3D11
+#	define XR_USE_GRAPHICS_API_D3D11
 #include "Graphics/GraphicsEngineD3D11/interface/RenderDeviceD3D11.h"
 #endif
 
@@ -56,10 +56,10 @@ XrResult GraphicsBinding_D3D11::CreateDevice( XrInstance instance, XrSystemId sy
 	m_instance = instance;
 	m_systemId = systemId;
 
-#    if ENGINE_DLL
+#	if ENGINE_DLL
 	// Load the dll and import GetEngineFactoryD3D11() function
 	auto* GetEngineFactoryD3D11 = LoadGraphicsEngineD3D11();
-#    endif
+#	endif
 	auto* pFactoryD3D11 = GetEngineFactoryD3D11();
 	m_pEngineFactory = pFactoryD3D11;
 
@@ -116,7 +116,7 @@ std::vector< RefCntAutoPtr<ITexture> > GraphicsBinding_D3D11::ReadImagesFromSwap
 {
 	std::vector< RefCntAutoPtr< ITexture > > textures;
 
-	uint32_t imageCount, depthImageCount;
+	uint32_t imageCount;
 	if ( XR_FAILED( xrEnumerateSwapchainImages( swapchain, 0, &imageCount, nullptr ) ) )
 		return {};
 
