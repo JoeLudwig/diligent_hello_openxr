@@ -2,7 +2,6 @@
 
 #include "igraphicsbinding.h"
 
-#include "Common/interface/RefCntAutoPtr.hpp"
 #include "Graphics/GraphicsEngineD3D11/interface/EngineFactoryD3D11.h"
 
 namespace Diligent
@@ -25,6 +24,7 @@ public:
 	virtual std::vector<int64_t> GetRequestedColorFormats() override;
 	virtual std::vector<int64_t> GetRequestedDepthFormats() override;
 	virtual void* GetSessionBinding() override;
+	virtual std::vector< Diligent::RefCntAutoPtr<Diligent::ITexture> > ReadImagesFromSwapchain( XrSwapchain swapchain ) override;
 
 
 private:

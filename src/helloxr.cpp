@@ -512,73 +512,7 @@ public:
         CHECK_XR_RESULT( xrEnumerateSwapchainImages( m_swapchain, 0, &imageCount, nullptr ) );
 		CHECK_XR_RESULT( xrEnumerateSwapchainImages( m_depthSwapchain, 0, &depthImageCount, nullptr ) );
 
-        std::vector< RefCntAutoPtr<ITexture> > textures;
-		std::vector< RefCntAutoPtr<ITexture> > depthTextures;
-
-		switch ( m_DeviceType )
-		{
-#if D3D11_SUPPORTED
-		case RENDER_DEVICE_TYPE_D3D11:
-		{
-            std::vector< XrSwapchainImageD3D11KHR > images;
-            images.resize( imageCount, { XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR } );
-			CHECK_XR_RESULT( xrEnumerateSwapchainImages( m_swapchain, 
-                imageCount, &imageCount, (XrSwapchainImageBaseHeader *)&images[0] ) );
-
-            for ( const XrSwapchainImageD3D11KHR& image : images )
-            {
-                RefCntAutoPtr< ITexture > pTexture;
-                GetD3D11Device()->CreateTexture2DFromD3DResource( image.texture, RESOURCE_STATE_UNKNOWN, &pTexture );
-                textures.push_back( pTexture );
-            }
-
-			std::vector< XrSwapchainImageD3D11KHR > depthImages;
-            depthImages.resize( depthImageCount, { XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR } );
-			CHECK_XR_RESULT( xrEnumerateSwapchainImages( m_depthSwapchain,
-                depthImageCount, &depthImageCount, (XrSwapchainImageBaseHeader*)&depthImages[ 0 ] ) );
-
-			for ( const XrSwapchainImageD3D11KHR& image : depthImages )
-			{
-				RefCntAutoPtr< ITexture > pTexture;
-				GetD3D11Device()->CreateTexture2DFromD3DResource( image.texture, RESOURCE_STATE_UNKNOWN, &pTexture );
-                depthTextures.push_back( pTexture );
-			}
-		}
-		break;
-#endif
-
-
-#if D3D12_SUPPORTED
-		case RENDER_DEVICE_TYPE_D3D12:
-		{
-			requestedFormats.push_back( DXGI_FORMAT_R16G16B16A16_FLOAT );
-			requestedFormats.push_back( DXGI_FORMAT_R8G8B8A8_UNORM );
-
-			static XrGraphicsBindingD3D12KHR d3d12Binding = { XR_TYPE_GRAPHICS_BINDING_D3D12_KHR };
-			createInfo.next = &d3d12Binding;
-
-			d3d12Binding.device = GetD3D12Device()->GetD3D12Device();
-		}
-		break;
-#endif
-
-
-#if GL_SUPPORTED
-		case RENDER_DEVICE_TYPE_GL:
-		{
-		}
-		break;
-#endif
-
-
-#if VULKAN_SUPPORTED
-		case RENDER_DEVICE_TYPE_VULKAN:
-		{
-		}
-		break;
-#endif
-		}
-
+        std::vector< RefCntAutoPtr<ITexture> > textures = m_pGraphicsBinding->ReadImagesFromSwapchain( m_swapchain );
 		for ( RefCntAutoPtr<ITexture> & pTexture: textures )
 		{
 			TextureViewDesc viewDesc;
@@ -597,7 +531,8 @@ public:
 			m_rpEyeSwapchainViews[ 1 ].push_back( pRightEyeView );
 		}
 
-		for ( RefCntAutoPtr<ITexture> & pTexture: depthTextures )
+		std::vector< RefCntAutoPtr<ITexture> > depthTextures = m_pGraphicsBinding->ReadImagesFromSwapchain( m_depthSwapchain );
+		for ( RefCntAutoPtr<ITexture>& pTexture : depthTextures )
 		{
 			TextureViewDesc viewDesc;
 			viewDesc.ViewType = TEXTURE_VIEW_DEPTH_STENCIL;

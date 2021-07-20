@@ -111,3 +111,28 @@ void* GraphicsBinding_D3D11::GetSessionBinding()
 {
 	return m_d3d11Binding;
 }
+
+std::vector< RefCntAutoPtr<ITexture> > GraphicsBinding_D3D11::ReadImagesFromSwapchain( XrSwapchain swapchain )
+{
+	std::vector< RefCntAutoPtr< ITexture > > textures;
+
+	uint32_t imageCount, depthImageCount;
+	if ( XR_FAILED( xrEnumerateSwapchainImages( swapchain, 0, &imageCount, nullptr ) ) )
+		return {};
+
+	std::vector< XrSwapchainImageD3D11KHR > images;
+	images.resize( imageCount, { XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR } );
+	if ( XR_FAILED( xrEnumerateSwapchainImages( swapchain, 
+		imageCount, &imageCount, (XrSwapchainImageBaseHeader*)&images[ 0 ] ) ) )
+		return {};
+
+	for ( const XrSwapchainImageD3D11KHR& image : images )
+	{
+		RefCntAutoPtr< ITexture > pTexture;
+		GetD3D11Device()->CreateTexture2DFromD3DResource( image.texture, RESOURCE_STATE_UNKNOWN, &pTexture );
+		textures.push_back( pTexture );
+	}
+
+	return textures;
+}
+
