@@ -410,50 +410,6 @@ public:
         std::vector< int64_t > requestedFormats = m_pGraphicsBinding->GetRequestedColorFormats();
         std::vector< int64_t > requestedDepthFormats = m_pGraphicsBinding->GetRequestedDepthFormats();
         createInfo.next = m_pGraphicsBinding->GetSessionBinding();
-//        switch ( m_DeviceType )
-//        {
-//#if D3D11_SUPPORTED
-//		case RENDER_DEVICE_TYPE_D3D11:
-//		{
-//
-//		}
-//		break;
-//#endif
-//
-//
-//#if D3D12_SUPPORTED
-//		case RENDER_DEVICE_TYPE_D3D12:
-//		{
-//			requestedFormats.push_back( DXGI_FORMAT_R16G16B16A16_FLOAT );
-//			requestedFormats.push_back( DXGI_FORMAT_R8G8B8A8_UNORM );
-//			requestedDepthFormats.push_back( DXGI_FORMAT_D32_FLOAT );
-//			requestedDepthFormats.push_back( DXGI_FORMAT_D16_UNORM );
-//
-//			static XrGraphicsBindingD3D12KHR d3d12Binding = { XR_TYPE_GRAPHICS_BINDING_D3D12_KHR };
-//			createInfo.next = &d3d12Binding;
-//
-//			d3d12Binding.device = GetD3D12Device()->GetD3D12Device();
-//		}
-//		break;
-//#endif
-//
-//
-//#if GL_SUPPORTED
-//		case RENDER_DEVICE_TYPE_GL:
-//		{
-//		}
-//		break;
-//#endif
-//
-//
-//#if VULKAN_SUPPORTED
-//		case RENDER_DEVICE_TYPE_VULKAN:
-//		{
-//		}
-//		break;
-//#endif
-//        }
-
         CHECK_XR_RESULT( xrCreateSession( m_instance, &createInfo, &m_session ) );
 
         uint32_t swapchainFormatCount;
