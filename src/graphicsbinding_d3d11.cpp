@@ -3,7 +3,6 @@
 #include <d3d11.h>
 #	define XR_USE_GRAPHICS_API_D3D11
 #include "Graphics/GraphicsEngineD3D11/interface/RenderDeviceD3D11.h"
-#endif
 
 #include <openxr/openxr_platform.h>
 
@@ -11,37 +10,12 @@
 
 using namespace Diligent;
 
-#if D3D11_SUPPORTED || D3D12_SUPPORTED
-#include <wrl/client.h>
-
-UINT GetAdapterIndexFromLuid( LUID adapterId )
-{
-	// Create the DXGI factory.
-	Microsoft::WRL::ComPtr<IDXGIFactory1> dxgiFactory;
-	if ( FAILED( CreateDXGIFactory1( __uuidof( IDXGIFactory1 ), reinterpret_cast<void**>( dxgiFactory.ReleaseAndGetAddressOf() ) ) ) )
-		return 0;
-
-	for ( UINT adapterIndex = 0;; adapterIndex++ )
-	{
-		// EnumAdapters1 will fail with DXGI_ERROR_NOT_FOUND when there are no more adapters to enumerate.
-		Microsoft::WRL::ComPtr<IDXGIAdapter1> dxgiAdapter;
-		if ( FAILED( dxgiFactory->EnumAdapters1( adapterIndex, dxgiAdapter.ReleaseAndGetAddressOf() ) ) )
-			break;
-
-		DXGI_ADAPTER_DESC1 adapterDesc;
-		if ( FAILED( dxgiAdapter->GetDesc1( &adapterDesc ) ) )
-			continue;
-		if ( memcmp( &adapterDesc.AdapterLuid, &adapterId, sizeof( adapterId ) ) == 0 ) {
-			return adapterIndex;
-		}
-	}
-	return 0;
-}
-#endif
-
 GraphicsBinding_D3D11::~GraphicsBinding_D3D11()
 {
-	delete m_d3d11Binding;
+	if (m_d3d11Binding)
+	{
+		delete m_d3d11Binding;
+	}
 }
 
 
@@ -135,4 +109,32 @@ std::vector< RefCntAutoPtr<ITexture> > GraphicsBinding_D3D11::ReadImagesFromSwap
 
 	return textures;
 }
+#endif
 
+#if D3D11_SUPPORTED || D3D12_SUPPORTED
+#include <wrl/client.h>
+
+UINT GetAdapterIndexFromLuid( LUID adapterId )
+{
+	// Create the DXGI factory.
+	Microsoft::WRL::ComPtr<IDXGIFactory1> dxgiFactory;
+	if ( FAILED( CreateDXGIFactory1( __uuidof( IDXGIFactory1 ), reinterpret_cast<void**>( dxgiFactory.ReleaseAndGetAddressOf() ) ) ) )
+		return 0;
+
+	for ( UINT adapterIndex = 0;; adapterIndex++ )
+	{
+		// EnumAdapters1 will fail with DXGI_ERROR_NOT_FOUND when there are no more adapters to enumerate.
+		Microsoft::WRL::ComPtr<IDXGIAdapter1> dxgiAdapter;
+		if ( FAILED( dxgiFactory->EnumAdapters1( adapterIndex, dxgiAdapter.ReleaseAndGetAddressOf() ) ) )
+			break;
+
+		DXGI_ADAPTER_DESC1 adapterDesc;
+		if ( FAILED( dxgiAdapter->GetDesc1( &adapterDesc ) ) )
+			continue;
+		if ( memcmp( &adapterDesc.AdapterLuid, &adapterId, sizeof( adapterId ) ) == 0 ) {
+			return adapterIndex;
+		}
+	}
+	return 0;
+}
+#endif

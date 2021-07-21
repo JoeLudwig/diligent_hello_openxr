@@ -1,21 +1,20 @@
 #pragma once
 
-#if D3D11_SUPPORTED
 #include "igraphicsbinding.h"
 
-#include "Graphics/GraphicsEngineD3D11/interface/EngineFactoryD3D11.h"
+#include "Graphics/GraphicsEngineD3D12/interface/EngineFactoryD3D12.h"
 
 namespace Diligent
 {
-	struct IRenderDeviceD3D11;
+	struct IRenderDeviceD3D12;
 }
 
-struct XrGraphicsBindingD3D11KHR;
+struct XrGraphicsBindingD3D12KHR;
 
-class GraphicsBinding_D3D11 : public IGraphicsBinding
+class GraphicsBinding_D3D12 : public IGraphicsBinding
 {
 public:
-	virtual ~GraphicsBinding_D3D11();
+	virtual ~GraphicsBinding_D3D12();
 
 	virtual std::vector<std::string> GetXrExtensions() override;
 	virtual XrResult CreateDevice( XrInstance instance, XrSystemId systemId ) override;
@@ -29,20 +28,14 @@ public:
 
 
 private:
-	Diligent::IRenderDeviceD3D11* GetD3D11Device() { return (Diligent::IRenderDeviceD3D11*)GetRenderDevice(); }
+	Diligent::IRenderDeviceD3D12* GetD3D12Device() { return (Diligent::IRenderDeviceD3D12*)GetRenderDevice(); }
 
-	Diligent::RefCntAutoPtr<Diligent::IEngineFactoryD3D11>         m_pEngineFactory;
+	Diligent::RefCntAutoPtr<Diligent::IEngineFactoryD3D12>         m_pEngineFactory;
 	Diligent::RefCntAutoPtr<Diligent::IRenderDevice>  m_pDevice;
 	Diligent::RefCntAutoPtr<Diligent::IDeviceContext> m_pImmediateContext;
 
 	XrInstance m_instance = XR_NULL_HANDLE;
 	XrSystemId m_systemId;
 
-	XrGraphicsBindingD3D11KHR *m_d3d11Binding = nullptr;
+	XrGraphicsBindingD3D12KHR *m_d3d12Binding = nullptr;
 };
-#endif
-
-#if D3D11_SUPPORTED || D3D12_SUPPORTED
-#include <dxgi.h>
-UINT GetAdapterIndexFromLuid( LUID adapterId );
-#endif

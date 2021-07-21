@@ -8,6 +8,8 @@ add_executable(HelloDiligentXr
 		igraphicsbinding.h
 		graphicsbinding_d3d11.cpp
 		graphicsbinding_d3d11.h
+		graphicsbinding_d3d12.cpp
+		graphicsbinding_d3d12.h
 )
 
 target_compile_options(HelloDiligentXr PRIVATE -DUNICODE -DENGINE_DLL)
