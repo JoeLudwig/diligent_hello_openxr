@@ -11,6 +11,7 @@ add_executable(HelloDiligentXr
 		graphicsbinding_d3d12.cpp
 		graphicsbinding_d3d12.h
 )
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT bar)
 
 target_compile_options(HelloDiligentXr PRIVATE -DUNICODE -DENGINE_DLL)
 target_include_directories(HelloDiligentXr 
