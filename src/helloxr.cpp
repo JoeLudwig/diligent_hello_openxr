@@ -107,6 +107,8 @@
 #include "graphics_utilities.h"
 #include "igraphicsbinding.h"
 
+#include "iapp.h"
+
 #define CHECK_XR_RESULT( res ) \
 	do { \
 		if( FAILED( res ) ) \
@@ -157,19 +159,32 @@ XrExtensionMap GetAvailableOpenXRExtensions()
 	return res;
 }
 
-class HelloXrApp
+class HelloXrApp: public IApp
 {
 public:
 	HelloXrApp()
 	{
 	}
 
-	~HelloXrApp()
+	virtual ~HelloXrApp()
 	{
 		if (m_pGraphicsBinding)
 		{
 			m_pGraphicsBinding->GetImmediateContext()->Flush();
 		}
+	}
+
+	virtual std::string GetWindowName() override
+	{
+		std::string title( "Tutorial00: Hello Win32" );
+		switch ( GetDeviceType() )
+		{
+			case RENDER_DEVICE_TYPE_D3D11: title.append( " (D3D11)" ); break;
+			case RENDER_DEVICE_TYPE_D3D12: title.append( " (D3D12)" ); break;
+			case RENDER_DEVICE_TYPE_GL: title.append( " (GL)" ); break;
+			case RENDER_DEVICE_TYPE_VULKAN: title.append( " (VK)" ); break;
+		}
+		return title;
 	}
 
 	bool Initialize(HWND hWnd)
@@ -191,6 +206,8 @@ public:
 			return false;
 		}
 
+
+		m_prevFrameTime = m_frameTimer.GetElapsedTime();
 
  		Win32NativeWindow Window { hWnd };
 		SwapChainDesc SCDesc;
@@ -500,10 +517,10 @@ public:
 	}
 
 
-	bool ProcessCommandLine(const char* CmdLine)
+	virtual bool ProcessCommandLine( const std::string & cmdLine ) override
 	{
 		const auto* Key = "-mode ";
-		const auto* pos = strstr(CmdLine, Key);
+		const auto* pos = strstr(cmdLine.c_str(), Key);
 		if (pos != nullptr)
 		{
 			pos += strlen(Key);
@@ -564,6 +581,19 @@ public:
 		return true;
 	}
 
+	virtual void RunMainFrame() override
+	{
+
+		RunXrFrame();
+
+		auto currTIme = m_frameTimer.GetElapsedTime();
+		auto elapsedTime = currTIme - m_prevFrameTime;
+		m_prevFrameTime = currTIme;
+		Update( currTIme, elapsedTime );
+
+		Render();
+		Present();
+	}
 
 #if D3D11_SUPPORTED
 	IRenderDeviceD3D11* GetD3D11Device() { return (IRenderDeviceD3D11 *)m_pGraphicsBinding->GetRenderDevice(); }
@@ -583,7 +613,7 @@ public:
 		m_pSwapChain->Present( 0 );
 	}
 
-	void WindowResize(Uint32 Width, Uint32 Height)
+	virtual void WindowResize(Uint32 Width, Uint32 Height) override
 	{
 		if (m_pSwapChain)
 			m_pSwapChain->Resize(Width, Height);
@@ -635,6 +665,9 @@ private:
 	XrSwapchain m_depthSwapchain = XR_NULL_HANDLE;
 	XrSpace m_stageSpace = XR_NULL_HANDLE;
 	XrSessionState m_sessionState = XR_SESSION_STATE_UNKNOWN;
+
+	Diligent::Timer m_frameTimer;
+	double m_prevFrameTime = 0;
 };
 
 void HelloXrApp::ProcessOpenXrEvents()
@@ -1046,124 +1079,9 @@ void HelloXrApp::Update( double CurrTime, double ElapsedTime )
 
 std::unique_ptr<HelloXrApp> g_pTheApp;
 
-LRESULT CALLBACK MessageProc(HWND, UINT, WPARAM, LPARAM);
-// Main
-int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int cmdShow)
+std::unique_ptr<IApp> CreateApp()
 {
-#if defined(_DEBUG) || defined(DEBUG)
-	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-#endif
-
-	g_pTheApp.reset(new HelloXrApp);
-
-	const auto* cmdLine = GetCommandLineA();
-	if (!g_pTheApp->ProcessCommandLine(cmdLine))
-		return -1;
-
-	std::wstring Title(L"Tutorial00: Hello Win32");
-	switch (g_pTheApp->GetDeviceType())
-	{
-		case RENDER_DEVICE_TYPE_D3D11: Title.append(L" (D3D11)"); break;
-		case RENDER_DEVICE_TYPE_D3D12: Title.append(L" (D3D12)"); break;
-		case RENDER_DEVICE_TYPE_GL: Title.append(L" (GL)"); break;
-		case RENDER_DEVICE_TYPE_VULKAN: Title.append(L" (VK)"); break;
-	}
-	// Register our window class
-	WNDCLASSEX wcex = {sizeof(WNDCLASSEX), CS_HREDRAW | CS_VREDRAW, MessageProc,
-					   0L, 0L, instance, NULL, NULL, NULL, NULL, L"SampleApp", NULL};
-	RegisterClassEx(&wcex);
-
-	// Create a window
-	LONG WindowWidth  = 1280;
-	LONG WindowHeight = 1024;
-	RECT rc		   = {0, 0, WindowWidth, WindowHeight};
-	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
-	HWND wnd = CreateWindow(L"SampleApp", Title.c_str(),
-							WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
-							rc.right - rc.left, rc.bottom - rc.top, NULL, NULL, instance, NULL);
-	if (!wnd)
-	{
-		MessageBox(NULL, L"Cannot create window", L"Error", MB_OK | MB_ICONERROR);
-		return 0;
-	}
-	ShowWindow(wnd, cmdShow);
-	UpdateWindow(wnd);
-
-	if (!g_pTheApp->Initialize(wnd))
-		return -1;
-
-	Diligent::Timer Timer;
-
-	auto   PrevTime = Timer.GetElapsedTime();
-
-	// Main message loop
-	MSG msg = {0};
-	while (WM_QUIT != msg.message)
-	{
-		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-		{
-			TranslateMessage(&msg);
-			DispatchMessage(&msg);
-		}
-		else
-		{
-			g_pTheApp->RunXrFrame();
-
-			auto CurrTime = Timer.GetElapsedTime();
-			auto ElapsedTime = CurrTime - PrevTime;
-			PrevTime = CurrTime;
-			g_pTheApp->Update( CurrTime, ElapsedTime );
-
-			g_pTheApp->Render();
-			g_pTheApp->Present();
-		}
-	}
-
-	g_pTheApp.reset();
-
-	return (int)msg.wParam;
-}
-
-// Called every time the NativeNativeAppBase receives a message
-LRESULT CALLBACK MessageProc(HWND wnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	switch (message)
-	{
-		case WM_PAINT:
-		{
-			PAINTSTRUCT ps;
-			BeginPaint(wnd, &ps);
-			EndPaint(wnd, &ps);
-			return 0;
-		}
-		case WM_SIZE: // Window size has been changed
-			if (g_pTheApp)
-			{
-				g_pTheApp->WindowResize(LOWORD(lParam), HIWORD(lParam));
-			}
-			return 0;
-
-		case WM_CHAR:
-			if (wParam == VK_ESCAPE)
-				PostQuitMessage(0);
-			return 0;
-
-		case WM_DESTROY:
-			PostQuitMessage(0);
-			return 0;
-
-		case WM_GETMINMAXINFO:
-		{
-			LPMINMAXINFO lpMMI = (LPMINMAXINFO)lParam;
-
-			lpMMI->ptMinTrackSize.x = 320;
-			lpMMI->ptMinTrackSize.y = 240;
-			return 0;
-		}
-
-		default:
-			return DefWindowProc(wnd, message, wParam, lParam);
-	}
+	return std::make_unique<HelloXrApp>();
 }
 
 // TODO:

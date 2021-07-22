@@ -4,14 +4,18 @@ add_executable(HelloDiligentXr
 	WIN32 
 		helloxr.cpp
 		graphics_utilities.h
+		iapp.h
 		igraphicsbinding.cpp
 		igraphicsbinding.h
 		graphicsbinding_d3d11.cpp
 		graphicsbinding_d3d11.h
 		graphicsbinding_d3d12.cpp
 		graphicsbinding_d3d12.h
+		main_windows.cpp
 )
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT bar)
+
+target_compile_definitions( HelloDiligentXr PRIVATE _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING )
 
 target_compile_options(HelloDiligentXr PRIVATE -DUNICODE -DENGINE_DLL)
 target_include_directories(HelloDiligentXr 
