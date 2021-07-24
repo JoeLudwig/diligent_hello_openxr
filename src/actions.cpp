@@ -1,6 +1,7 @@
 #pragma once
 
 #include "actions.h"
+#include "graphics_utilities.h"
 
 using namespace XRDE;
 
@@ -14,8 +15,45 @@ ActionSet::ActionSet( const std::string& name, const std::string& localizedName,
 
 XrResult ActionSet::Init( XrInstance instance )
 {
-	return xrCreateActionSet( instance, &m_createInfo, &m_handle );
+	XrResult res = xrCreateActionSet( instance, &m_createInfo, &m_handle );
+	if ( XR_FAILED( res ) )
+		return res;
+
+	for ( auto& action : m_actions )
+	{
+		res = action->Init( instance );
+		if ( XR_FAILED( res ) )
+			return res;
+	}
+
+	return XR_SUCCESS;
 }
+
+
+XrResult ActionSet::SessionInit( XrSession session )
+{
+	for ( auto& action : m_actions )
+	{
+		if ( action->ActionType() != XR_ACTION_TYPE_POSE_INPUT )
+			continue;
+
+		XrResult res = action->CreateSpaces( session );
+		if ( XR_FAILED( res ) )
+			return res;
+	}
+	return XR_SUCCESS;
+}
+
+
+Action* ActionSet::AddAction( const std::string& name, const std::string& localizedName, XrActionType type, 
+	const std::vector<XrPath>& subactionPaths )
+{
+	std::unique_ptr<Action> action( new Action( name, localizedName, type, this, subactionPaths ) );
+	Action* actionPtr = action.get();
+	m_actions.push_back( std::move( action ) );
+	return actionPtr;
+}
+
 
 Action::Action( const std::string& name, const std::string& localizedName, XrActionType type, ActionSet* actionSet, 
 	const std::vector<XrPath>& subactionPaths )
@@ -56,6 +94,18 @@ XrResult Action::CreateSpace( XrSession session, XrPath subactionPath, const XrP
 		m_spaces[ subactionPath ] = space;
 	}
 	return res;
+}
+
+XrResult Action::CreateSpaces( XrSession session )
+{
+	for ( XrPath subactionPath : m_subactionPaths )
+	{
+		XrResult res = CreateSpace( session, subactionPath, IdentityXrPose() );
+		if ( XR_FAILED( res ) )
+			return res;
+	}
+
+	return XR_SUCCESS;
 }
 
 
@@ -168,13 +218,16 @@ std::vector< XrActionSuggestedBinding > Action::CollectBindings( XrPath interact
 	return out;
 }
 
-XrResult XRDE::SuggestBindings( XrInstance instance, XrPath interactionProfile, const std::vector<const Action*>& actions )
+XrResult XRDE::SuggestBindings( XrInstance instance, XrPath interactionProfile, const std::vector<const ActionSet*>& actionSets )
 {
 	std::vector<XrActionSuggestedBinding> bindings;
-	for ( const Action* action : actions )
+	for ( const ActionSet* actionSet : actionSets )
 	{
-		std::vector<XrActionSuggestedBinding> thisActionBindings = action->CollectBindings( interactionProfile );
-		bindings.insert( bindings.end(), thisActionBindings.begin(), thisActionBindings.end() );
+		for ( auto i = actionSet->begin(); i != actionSet->end(); i++ )
+		{
+			std::vector<XrActionSuggestedBinding> thisActionBindings = (*i)->CollectBindings( interactionProfile );
+			bindings.insert( bindings.end(), thisActionBindings.begin(), thisActionBindings.end() );
+		}
 	}
 
 	XrInteractionProfileSuggestedBinding suggestedBindings = { XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };

@@ -171,9 +171,9 @@ private:
 	bool								m_hideCube[ 2 ] = { false, false };
 
 	std::unique_ptr< XRDE::ActionSet > m_handActionSet;
-	std::unique_ptr< XRDE::Action > m_handAction;
-	std::unique_ptr< XRDE::Action > m_hideCubeAction;
-	std::unique_ptr< XRDE::Action > m_hapticAction;
+	XRDE::Action * m_handAction;
+	XRDE::Action * m_hideCubeAction;
+	XRDE::Action * m_hapticAction;
 
 };
 
@@ -188,34 +188,29 @@ bool HelloXrApp::PreSession()
 
 	m_handActionSet = std::make_unique<ActionSet>( "hands", "Hands", 0 );
 
-	m_handAction = std::make_unique<Action>( "handpose", "Hand Location", XR_ACTION_TYPE_POSE_INPUT, m_handActionSet.get(),
+	m_handAction = m_handActionSet->AddAction( "handpose", "Hand Location", XR_ACTION_TYPE_POSE_INPUT, 
 		std::vector( { leftHand, rightHand } ) );
 	m_handAction->AddGlobalBinding( Paths().rightGripPose );
 	m_handAction->AddGlobalBinding( Paths().leftGripPose );
 
-	m_hideCubeAction = std::make_unique<Action>( "hidecube", "Hide Cube", XR_ACTION_TYPE_BOOLEAN_INPUT, m_handActionSet.get(),
+	m_hideCubeAction = m_handActionSet->AddAction( "hidecube", "Hide Cube", XR_ACTION_TYPE_BOOLEAN_INPUT,
 		std::vector( { leftHand, rightHand } ) );
 	m_hideCubeAction->AddGlobalBinding( Paths().rightTrigger );
 	m_hideCubeAction->AddGlobalBinding( Paths().leftTrigger );
 
-	m_hapticAction = std::make_unique<Action>( "haptics", "Cube Haptics", XR_ACTION_TYPE_VIBRATION_OUTPUT, m_handActionSet.get(),
+	m_hapticAction = m_handActionSet->AddAction( "haptics", "Cube Haptics", XR_ACTION_TYPE_VIBRATION_OUTPUT,
 		std::vector( { leftHand, rightHand } ) );
 	m_hapticAction->AddGlobalBinding( Paths().rightHaptic);
 	m_hapticAction->AddGlobalBinding( Paths().leftHaptic );
 
 	CHECK_XR_RESULT( m_handActionSet->Init( m_instance ) );
-	CHECK_XR_RESULT( m_handAction->Init( m_instance ) );
-	CHECK_XR_RESULT( m_hideCubeAction->Init( m_instance ) );
-	CHECK_XR_RESULT( m_hapticAction->Init( m_instance ) );
 
-	std::vector<const Action*> allActions(
+	std::vector<const ActionSet*> actionSets(
 		{
-			&*m_handAction,
-			&*m_hideCubeAction,
-			&*m_hapticAction,
+			&*m_handActionSet,
 		} );
 
-	CHECK_XR_RESULT( SuggestBindings( m_instance, Paths().interactionProfilesValveIndexController, allActions ) );
+	CHECK_XR_RESULT( SuggestBindings( m_instance, Paths().interactionProfilesValveIndexController, actionSets ) );
 
 	return true;
 }
@@ -225,8 +220,7 @@ bool HelloXrApp::PostSession()
 {
 	CHECK_XR_RESULT( AttachActionSets( m_session, { &*m_handActionSet } ) );
 
-	CHECK_XR_RESULT( m_handAction->CreateSpace( m_session, Paths().userHandLeft, IdentityXrPose() ) );
-	CHECK_XR_RESULT( m_handAction->CreateSpace( m_session, Paths().userHandRight, IdentityXrPose() ) );
+	CHECK_XR_RESULT( m_handActionSet->SessionInit( m_session ) );
 
 	return true;
 }
