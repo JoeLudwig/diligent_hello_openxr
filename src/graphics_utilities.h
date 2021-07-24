@@ -97,3 +97,12 @@ inline Diligent::float3 vectorFromXrVector( const XrVector3f& in )
 {
 	return Diligent::float3( in.x, in.y, in.z );
 }
+
+inline XrPosef IdentityXrPose()
+{
+	XrPosef pose;
+	pose.orientation = { 0, 0, 0, 1.f };
+	pose.position = { 0, 0, 0 };
+	return pose;
+}
+
