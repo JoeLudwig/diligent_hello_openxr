@@ -106,3 +106,9 @@ inline XrPosef IdentityXrPose()
 	return pose;
 }
 
+
+inline Diligent::float4x4 matrixFromPose( const XrPosef & pose )
+{
+	return quaternionFromXrQuaternion( pose.orientation ).ToMatrix()
+		* Diligent::float4x4::Translation( vectorFromXrVector( pose.position ) );
+}

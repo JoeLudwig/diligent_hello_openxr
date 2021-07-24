@@ -69,10 +69,11 @@ public:
 	bool CreateSession();
 	virtual bool ProcessCommandLine( const std::string& cmdLine ) override;
 	virtual void RunMainFrame() override;
-
+	virtual bool PreSession() {	return true; }
+	virtual bool PostSession() { return true; }
 
 	virtual void Render() = 0;
-	virtual void Update( double currTime, double elapsedTime ) = 0;
+	virtual void Update( double currTime, double elapsedTime, XrTime displayTime ) = 0;
 
 	void Present();
 
@@ -84,7 +85,7 @@ public:
 	bool ShouldRender() const;
 	bool ShouldWait() const;
 
-	bool RunXrFrame();
+	bool RunXrFrame( XrTime *displayTime );
 	virtual bool RenderEye( const XrView& view, Diligent::ITextureView* eyeBuffer, Diligent::ITextureView* depthBuffer ) = 0;
 
 protected:

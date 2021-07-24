@@ -109,8 +109,8 @@
 #include "graphics_utilities.h"
 #include "igraphicsbinding.h"
 
-#include "iapp.h"
-
+#include "actions.h"
+#include "paths.h"
 
 using namespace Diligent;
 
@@ -147,15 +147,16 @@ public:
 	}
 
 
-	void Render();
-	void Update( double currTime, double elapsedTime );
-
+	virtual void Render() override;
+	virtual void Update( double currTime, double elapsedTime, XrTime displayTime ) override;
+	virtual bool PreSession() override;
+	virtual bool PostSession() override;
 
 	void CreatePipelineState();
 	void CreateVertexBuffer();
 	void CreateIndexBuffer();
 
-	bool RenderEye( const XrView& view, ITextureView *eyeBuffer, ITextureView* depthBuffer );
+	virtual bool RenderEye( const XrView& view, ITextureView *eyeBuffer, ITextureView* depthBuffer ) override;
 
 private:
 	RefCntAutoPtr<IPipelineState>		 m_pPSO;
@@ -165,8 +166,53 @@ private:
 	RefCntAutoPtr<IBuffer>				m_VSConstants;
 	float4x4							  m_CubeToWorld;
 	float4x4							  m_ViewToProj;
+	float4x4							m_handCubeToWorld[ 2 ];
+	bool								m_handCubeToWorldValid[ 2 ] = { false, false };
+
+	std::unique_ptr< XRDE::ActionSet > m_handActionSet;
+	std::unique_ptr< XRDE::Action > m_handAction;
 
 };
+
+
+
+using namespace XRDE;
+
+bool HelloXrApp::PreSession()
+{
+	XrPath leftHand = StringToPath( m_instance, k_userHandLeft );
+	XrPath rightHand = StringToPath( m_instance, k_userHandRight );
+
+	m_handActionSet = std::make_unique<ActionSet>( "hands", "Hands", 0 );
+
+	m_handAction = std::make_unique<Action>( "handpose", "Hand Location", XR_ACTION_TYPE_POSE_INPUT, m_handActionSet.get(),
+		std::vector( { leftHand, rightHand } ) );
+	m_handAction->AddGlobalBinding( Paths().rightGripPose );
+	m_handAction->AddGlobalBinding( Paths().leftGripPose );
+
+	CHECK_XR_RESULT( m_handActionSet->Init( m_instance ) );
+	CHECK_XR_RESULT( m_handAction->Init( m_instance ) );
+
+	std::vector<const Action*> allActions(
+		{
+			&*m_handAction,
+		} );
+
+	CHECK_XR_RESULT( SuggestBindings( m_instance, Paths().interactionProfilesValveIndexController, allActions ) );
+
+	return true;
+}
+
+
+bool HelloXrApp::PostSession()
+{
+	CHECK_XR_RESULT( AttachActionSets( m_session, { &*m_handActionSet } ) );
+
+	CHECK_XR_RESULT( m_handAction->CreateSpace( m_session, Paths().userHandLeft, IdentityXrPose() ) );
+	CHECK_XR_RESULT( m_handAction->CreateSpace( m_session, Paths().userHandRight, IdentityXrPose() ) );
+
+	return true;
+}
 
 
 bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextureView* depthBuffer )
@@ -210,6 +256,21 @@ bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextu
 	// Verify the state of vertex and index buffers
 	DrawAttrs.Flags = DRAW_FLAG_VERIFY_ALL;
 	m_pGraphicsBinding->GetImmediateContext()->DrawIndexed( DrawAttrs );
+
+	// draw the hands if they're available
+	for ( int cube = 0; cube < 2; cube++ )
+	{
+		if ( !m_handCubeToWorldValid[ cube ] )
+			continue;
+
+		{
+			// Map the buffer and write current world-view-projection matrix
+			MapHelper<float4x4> CBConstants( m_pGraphicsBinding->GetImmediateContext(), m_VSConstants, MAP_WRITE, MAP_FLAG_DISCARD );
+			*CBConstants = ( m_handCubeToWorld[cube] * stageToEye * eyeToProj ).Transpose();
+		}
+
+		m_pGraphicsBinding->GetImmediateContext()->DrawIndexed( DrawAttrs );
+	}
 
 	return true;
 }
@@ -433,12 +494,47 @@ void HelloXrApp::Render()
 }
 
 
-void HelloXrApp::Update( double CurrTime, double ElapsedTime )
+void HelloXrApp::Update( double CurrTime, double ElapsedTime, XrTime displayTime )
 {
+	// read input
+	XrActiveActionSet activeActionSets[] =
+	{
+		{ m_handActionSet->Handle(), Paths().userHandLeft },
+		{ m_handActionSet->Handle(), Paths().userHandRight },
+	};
+	XrActionsSyncInfo syncInfo = { XR_TYPE_ACTIONS_SYNC_INFO };
+	syncInfo.activeActionSets = activeActionSets;
+	syncInfo.countActiveActionSets = sizeof( activeActionSets ) / sizeof( activeActionSets[ 0 ] );
+	xrSyncActions( m_session, &syncInfo );
+
+	XrSpaceLocation spaceLocation = { XR_TYPE_SPACE_LOCATION };
+	if( XR_SUCCEEDED( m_handAction->LocateSpace( m_stageSpace, displayTime, Paths().userHandLeft, &spaceLocation ) ) 
+		&& ( spaceLocation.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT ) != 0 )
+	{
+		m_handCubeToWorld[0] = float4x4::Scale( 0.05f ) * matrixFromPose( spaceLocation.pose );
+		m_handCubeToWorldValid[ 0 ] = true;
+	}
+	else
+	{
+		m_handCubeToWorldValid[ 0 ] = false;
+	}
+	if ( XR_SUCCEEDED( m_handAction->LocateSpace( m_stageSpace, displayTime, Paths().userHandRight, &spaceLocation ) )
+		&& ( spaceLocation.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT ) != 0 )
+	{
+		m_handCubeToWorld[ 1 ] = float4x4::Scale( 0.05f ) * matrixFromPose( spaceLocation.pose );
+		m_handCubeToWorldValid[ 1 ] = true;
+	}
+	else
+	{
+		m_handCubeToWorldValid[ 1 ] = false;
+	}
+
 	// Apply rotation
 	m_CubeToWorld = float4x4::Scale( 0.5f ) 
 		* float4x4::RotationY( static_cast<float>( CurrTime ) * 1.0f ) 
 		* float4x4::RotationX( -PI_F * 0.1f );
+
+
 }
 
 

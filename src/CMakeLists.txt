@@ -14,6 +14,10 @@ add_executable(HelloDiligentXr
 		main_windows.cpp
 		xrappbase.cpp
 		xrappbase.h
+		actions.cpp
+		actions.h
+		paths.cpp
+		paths.h
 )
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT bar)
 

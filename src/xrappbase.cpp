@@ -70,6 +70,7 @@
 #include "igraphicsbinding.h"
 
 #include "iapp.h"
+#include "paths.h"
 
 using namespace Diligent;
 
@@ -237,7 +238,13 @@ bool XrAppBase::Initialize( HWND hWnd )
 		break;
 	}
 
+	if ( !PreSession() )
+		return false;
+
 	if ( !CreateSession() )
+		return false;
+
+	if ( !PostSession() )
 		return false;
 
 	return true;
@@ -316,6 +323,8 @@ bool XrAppBase::InitializeOpenXr()
 	{
 		return false;
 	}
+
+	XRDE::InitPaths( m_instance );
 
 	XrSystemGetInfo getInfo = { XR_TYPE_SYSTEM_GET_INFO };
 	getInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
@@ -519,13 +528,13 @@ bool XrAppBase::ProcessCommandLine( const std::string& cmdLine )
 
 void XrAppBase::RunMainFrame()
 {
-
-	RunXrFrame();
+	XrTime displayTime;
+	RunXrFrame( &displayTime );
 
 	auto currTIme = m_frameTimer.GetElapsedTime();
 	auto elapsedTime = currTIme - m_prevFrameTime;
 	m_prevFrameTime = currTIme;
-	Update( currTIme, elapsedTime );
+	Update( currTIme, elapsedTime, displayTime );
 
 	Render();
 	Present();
@@ -610,9 +619,11 @@ void XrAppBase::ProcessOpenXrEvents()
 	}
 }
 
-bool XrAppBase::RunXrFrame()
+bool XrAppBase::RunXrFrame( XrTime *displayTime )
 {
 	ProcessOpenXrEvents();
+
+	*displayTime = 0;
 
 	if ( !ShouldWait() )
 		return true;
@@ -627,6 +638,7 @@ bool XrAppBase::RunXrFrame()
 	XrFrameEndInfo frameEndInfo = { XR_TYPE_FRAME_END_INFO };
 	frameEndInfo.displayTime = frameState.predictedDisplayTime;
 	frameEndInfo.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+	*displayTime = frameState.predictedDisplayTime;
 
 	XrCompositionLayerProjectionView projectionViews[ 2 ] = { { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW }, { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW } };
 	XrCompositionLayerProjection projectionLayer = { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
