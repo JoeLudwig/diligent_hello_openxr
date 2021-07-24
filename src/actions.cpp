@@ -109,6 +109,28 @@ Diligent::float2 Action::GetVector2State( XrSession session, XrPath subactionPat
 	return { getState.currentState.x, getState.currentState.y };
 }
 
+void Action::ApplyHapticFeedback( XrSession session, XrPath subactionPath, float durationSeconds, float frequency, float amplitude )
+{
+	XrHapticActionInfo actionInfo = { XR_TYPE_HAPTIC_ACTION_INFO };
+	actionInfo.action = Handle();
+	actionInfo.subactionPath = subactionPath;
+
+	XrHapticVibration vibration = { XR_TYPE_HAPTIC_VIBRATION };
+	vibration.duration = (XrDuration)( durationSeconds * 1000000000.f );
+	vibration.frequency = frequency;
+	vibration.amplitude = amplitude;
+	xrApplyHapticFeedback( session, &actionInfo, (XrHapticBaseHeader*)&vibration );
+}
+
+void Action::StopApplyingHapticFeecback( XrSession session, XrPath subactionPath )
+{
+	XrHapticActionInfo actionInfo = { XR_TYPE_HAPTIC_ACTION_INFO };
+	actionInfo.action = Handle();
+	actionInfo.subactionPath = subactionPath;
+
+	xrStopHapticFeedback( session, &actionInfo );
+}
+
 
 void Action::AddIPBinding( XrPath interactionProfile, XrPath bindingPath )
 {

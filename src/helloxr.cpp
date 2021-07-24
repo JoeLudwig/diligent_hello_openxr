@@ -173,6 +173,7 @@ private:
 	std::unique_ptr< XRDE::ActionSet > m_handActionSet;
 	std::unique_ptr< XRDE::Action > m_handAction;
 	std::unique_ptr< XRDE::Action > m_hideCubeAction;
+	std::unique_ptr< XRDE::Action > m_hapticAction;
 
 };
 
@@ -197,15 +198,21 @@ bool HelloXrApp::PreSession()
 	m_hideCubeAction->AddGlobalBinding( Paths().rightTrigger );
 	m_hideCubeAction->AddGlobalBinding( Paths().leftTrigger );
 
+	m_hapticAction = std::make_unique<Action>( "haptics", "Cube Haptics", XR_ACTION_TYPE_VIBRATION_OUTPUT, m_handActionSet.get(),
+		std::vector( { leftHand, rightHand } ) );
+	m_hapticAction->AddGlobalBinding( Paths().rightHaptic);
+	m_hapticAction->AddGlobalBinding( Paths().leftHaptic );
 
 	CHECK_XR_RESULT( m_handActionSet->Init( m_instance ) );
 	CHECK_XR_RESULT( m_handAction->Init( m_instance ) );
 	CHECK_XR_RESULT( m_hideCubeAction->Init( m_instance ) );
+	CHECK_XR_RESULT( m_hapticAction->Init( m_instance ) );
 
 	std::vector<const Action*> allActions(
 		{
 			&*m_handAction,
 			&*m_hideCubeAction,
+			&*m_hapticAction,
 		} );
 
 	CHECK_XR_RESULT( SuggestBindings( m_instance, Paths().interactionProfilesValveIndexController, allActions ) );
@@ -542,8 +549,25 @@ void HelloXrApp::Update( double CurrTime, double ElapsedTime, XrTime displayTime
 		m_handCubeToWorldValid[ 1 ] = false;
 	}
 
+	bool oldHideCube[ 2 ] = { m_hideCube[ 0 ], m_hideCube[ 1 ] };
 	m_hideCube[ 0 ] = m_hideCubeAction->GetBooleanState( m_session, Paths().userHandLeft );
 	m_hideCube[ 1 ] = m_hideCubeAction->GetBooleanState( m_session, Paths().userHandRight );
+	if ( oldHideCube[ 0 ] && !m_hideCube[ 0 ] )
+	{
+		m_hapticAction->ApplyHapticFeedback( m_session, Paths().userHandLeft, 3, 20, 1 );
+	}
+	else if ( !oldHideCube[ 0 ] && m_hideCube[ 0 ] )
+	{
+		m_hapticAction->StopApplyingHapticFeecback( m_session, Paths().userHandLeft );
+	}
+	if ( oldHideCube[ 1 ] && !m_hideCube[ 1 ] )
+	{
+		m_hapticAction->ApplyHapticFeedback( m_session, Paths().userHandRight, 3, 20, 1 );
+	}
+	else if ( !oldHideCube[ 1 ] && m_hideCube[ 1 ] )
+	{
+		m_hapticAction->StopApplyingHapticFeecback( m_session, Paths().userHandRight );
+	}
 
 	// Apply rotation
 	m_CubeToWorld = float4x4::Scale( 0.5f ) 

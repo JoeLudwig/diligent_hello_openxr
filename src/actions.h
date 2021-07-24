@@ -44,6 +44,9 @@ public:
 	float GetFloatState( XrSession session, XrPath subactionPath );
 	Diligent::float2 GetVector2State( XrSession session, XrPath subactionPath );
 
+	void ApplyHapticFeedback( XrSession session, XrPath subactionPath, float durationSeconds, float frequency, float amplitude );
+	void StopApplyingHapticFeecback( XrSession session, XrPath subactionPath );
+
 	std::vector< XrActionSuggestedBinding > CollectBindings( XrPath interactionProfile ) const;
 
 	XrAction Handle() const { return m_handle; }
