@@ -168,9 +168,11 @@ private:
 	float4x4							  m_ViewToProj;
 	float4x4							m_handCubeToWorld[ 2 ];
 	bool								m_handCubeToWorldValid[ 2 ] = { false, false };
+	bool								m_hideCube[ 2 ] = { false, false };
 
 	std::unique_ptr< XRDE::ActionSet > m_handActionSet;
 	std::unique_ptr< XRDE::Action > m_handAction;
+	std::unique_ptr< XRDE::Action > m_hideCubeAction;
 
 };
 
@@ -190,12 +192,20 @@ bool HelloXrApp::PreSession()
 	m_handAction->AddGlobalBinding( Paths().rightGripPose );
 	m_handAction->AddGlobalBinding( Paths().leftGripPose );
 
+	m_hideCubeAction = std::make_unique<Action>( "hidecube", "Hide Cube", XR_ACTION_TYPE_BOOLEAN_INPUT, m_handActionSet.get(),
+		std::vector( { leftHand, rightHand } ) );
+	m_hideCubeAction->AddGlobalBinding( Paths().rightTrigger );
+	m_hideCubeAction->AddGlobalBinding( Paths().leftTrigger );
+
+
 	CHECK_XR_RESULT( m_handActionSet->Init( m_instance ) );
 	CHECK_XR_RESULT( m_handAction->Init( m_instance ) );
+	CHECK_XR_RESULT( m_hideCubeAction->Init( m_instance ) );
 
 	std::vector<const Action*> allActions(
 		{
 			&*m_handAction,
+			&*m_hideCubeAction,
 		} );
 
 	CHECK_XR_RESULT( SuggestBindings( m_instance, Paths().interactionProfilesValveIndexController, allActions ) );
@@ -261,6 +271,9 @@ bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextu
 	for ( int cube = 0; cube < 2; cube++ )
 	{
 		if ( !m_handCubeToWorldValid[ cube ] )
+			continue;
+
+		if ( m_hideCube[ cube ] )
 			continue;
 
 		{
@@ -528,6 +541,9 @@ void HelloXrApp::Update( double CurrTime, double ElapsedTime, XrTime displayTime
 	{
 		m_handCubeToWorldValid[ 1 ] = false;
 	}
+
+	m_hideCube[ 0 ] = m_hideCubeAction->GetBooleanState( m_session, Paths().userHandLeft );
+	m_hideCube[ 1 ] = m_hideCubeAction->GetBooleanState( m_session, Paths().userHandRight );
 
 	// Apply rotation
 	m_CubeToWorld = float4x4::Scale( 0.5f ) 

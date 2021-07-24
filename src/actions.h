@@ -5,6 +5,8 @@
 #include <vector>
 #include <map>
 
+#include <Common/interface/BasicMath.hpp>
+
 namespace XRDE
 {
 
@@ -38,6 +40,9 @@ public:
 	XrResult CreateSpace( XrSession session, XrPath subactionPath, const XrPosef& poseInActionSpace );
 
 	XrResult LocateSpace( XrSpace baseSpace, XrTime time, XrPath subactionPath, XrSpaceLocation* location );
+	bool GetBooleanState( XrSession session, XrPath subactionPath );
+	float GetFloatState( XrSession session, XrPath subactionPath );
+	Diligent::float2 GetVector2State( XrSession session, XrPath subactionPath );
 
 	std::vector< XrActionSuggestedBinding > CollectBindings( XrPath interactionProfile ) const;
 

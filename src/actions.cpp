@@ -69,6 +69,47 @@ XrResult Action::LocateSpace( XrSpace baseSpace, XrTime time, XrPath subactionPa
 }
 
 
+bool Action::GetBooleanState( XrSession session, XrPath subactionPath )
+{
+	XrActionStateGetInfo getInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
+	getInfo.action = Handle();
+	getInfo.subactionPath = subactionPath;
+
+	XrActionStateBoolean getState = { XR_TYPE_ACTION_STATE_BOOLEAN };
+	if ( XR_FAILED( xrGetActionStateBoolean( session, &getInfo, &getState ) ) )
+		return false;
+
+	return getState.currentState;
+}
+
+float Action::GetFloatState( XrSession session, XrPath subactionPath )
+{
+	XrActionStateGetInfo getInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
+	getInfo.action = Handle();
+	getInfo.subactionPath = subactionPath;
+
+	XrActionStateFloat getState = { XR_TYPE_ACTION_STATE_BOOLEAN };
+	if ( XR_FAILED( xrGetActionStateFloat( session, &getInfo, &getState ) ) )
+		return 0.f;
+
+	return getState.currentState;
+}
+
+
+Diligent::float2 Action::GetVector2State( XrSession session, XrPath subactionPath )
+{
+	XrActionStateGetInfo getInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
+	getInfo.action = Handle();
+	getInfo.subactionPath = subactionPath;
+
+	XrActionStateVector2f getState = { XR_TYPE_ACTION_STATE_VECTOR2F};
+	if ( XR_FAILED( xrGetActionStateVector2f( session, &getInfo, &getState ) ) )
+		return { 0.f, 0.f };
+
+	return { getState.currentState.x, getState.currentState.y };
+}
+
+
 void Action::AddIPBinding( XrPath interactionProfile, XrPath bindingPath )
 {
 	m_bindings[ interactionProfile ].push_back( bindingPath );
