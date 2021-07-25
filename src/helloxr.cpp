@@ -184,13 +184,6 @@ private:
 
 	std::unique_ptr<GLTF::Model> m_leftHandModel;
 	std::unique_ptr<GLTF::Model> m_rightHandModel;
-	std::unique_ptr< GLTF_PBR_Renderer > m_gltfRenderer;
-	RefCntAutoPtr<ITextureView> m_pEnvironmentMapSRV;
-
-	RefCntAutoPtr<IBuffer>                m_CameraAttribsCB;
-	RefCntAutoPtr<IBuffer>                m_LightAttribsCB;
-	GLTF_PBR_Renderer::ModelResourceBindings m_leftModelResourceBindings;
-	GLTF_PBR_Renderer::ModelResourceBindings m_rightModelResourceBindings;
 };
 
 
@@ -238,43 +231,13 @@ bool HelloXrApp::PostSession()
 
 	CHECK_XR_RESULT( m_handActionSet->SessionInit( m_session ) );
 
-	GLTF_PBR_Renderer::CreateInfo rendererCi;
-	rendererCi.RTVFmt = m_rpEyeSwapchainViews[ 0 ].front()->GetDesc().Format;
-	rendererCi.DSVFmt = m_rpEyeDepthViews[ 0 ].front()->GetDesc().Format;
-	rendererCi.AllowDebugView = true;
-	rendererCi.UseIBL = true;
-	rendererCi.FrontCCW = true;
-	rendererCi.UseTextureAtals = true;
-	m_gltfRenderer = std::make_unique< GLTF_PBR_Renderer >( 
-		m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), rendererCi );
-
-	RefCntAutoPtr<ITexture> environmentMap;
-	CreateTextureFromFile( "textures/papermill.ktx", TextureLoadInfo { "Environment Map" }, m_pGraphicsBinding->GetRenderDevice(),
-		&environmentMap );
-	m_pEnvironmentMapSRV = environmentMap->GetDefaultView( TEXTURE_VIEW_SHADER_RESOURCE );
-	m_gltfRenderer->PrecomputeCubemaps( m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(),
-		m_pEnvironmentMapSRV );
-
-	CreateUniformBuffer( m_pGraphicsBinding->GetRenderDevice(), sizeof( CameraAttribs ), "Camera attribs buffer", &m_CameraAttribsCB );
-	CreateUniformBuffer( m_pGraphicsBinding->GetRenderDevice(), sizeof( LightAttribs ), "Light attribs buffer", &m_LightAttribsCB );
-//	CreateUniformBuffer( m_pGraphicsBinding->GetRenderDevice(), sizeof( EnvMapRenderAttribs ), "Env map render attribs buffer", &m_EnvMapRenderAttribsCB );
-	// clang-format off
-	StateTransitionDesc Barriers[] =
-	{
-		{m_CameraAttribsCB,        RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_CONSTANT_BUFFER, STATE_TRANSITION_FLAG_UPDATE_STATE},
-		{m_LightAttribsCB,         RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_CONSTANT_BUFFER, STATE_TRANSITION_FLAG_UPDATE_STATE},
-//		{m_EnvMapRenderAttribsCB,  RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_CONSTANT_BUFFER, STATE_TRANSITION_FLAG_UPDATE_STATE},
-//		{EnvironmentMap,           RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_SHADER_RESOURCE, STATE_TRANSITION_FLAG_UPDATE_STATE}
-	};
-	// clang-format on
-	m_pGraphicsBinding->GetImmediateContext()->TransitionResourceStates( _countof( Barriers ), Barriers );
+	SetPbrEnvironmentMap( "textures/papermill.ktx" );
 
 	m_leftHandModel = LoadGltfModel( "models/skinned_hand_left.glb" );
 	m_rightHandModel = LoadGltfModel( "models/skinned_hand_right.glb" );
 
 	return true;
 }
-
 
 bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextureView* depthBuffer )
 {

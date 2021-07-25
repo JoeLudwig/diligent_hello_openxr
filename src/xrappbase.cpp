@@ -43,6 +43,8 @@
 
 #include "Graphics/GraphicsTools/interface/MapHelper.hpp"
 #include <AssetLoader/interface/GLTFLoader.hpp>
+#include <TextureLoader/interface/TextureUtilities.h>
+#include "Graphics/GraphicsTools/interface/GraphicsUtilities.h"
 
  // Make sure the supported OpenXR graphics APIs are defined
 #if D3D11_SUPPORTED
@@ -72,6 +74,11 @@
 
 #include "iapp.h"
 #include "paths.h"
+
+namespace Diligent
+{
+#include <Shaders/Common/public/BasicStructures.fxh>
+};
 
 using namespace Diligent;
 
@@ -246,6 +253,8 @@ bool XrAppBase::Initialize( HWND hWnd )
 
 	if ( !CreateSession() )
 		return false;
+
+	CreateGltfRenderer();
 
 	if ( !PostSession() )
 		return false;
@@ -777,3 +786,43 @@ std::unique_ptr<GLTF::Model> XrAppBase::LoadGltfModel( const std::string& path )
 
 	return model;
 }
+
+void XrAppBase::CreateGltfRenderer()
+{
+	GLTF_PBR_Renderer::CreateInfo rendererCi;
+	rendererCi.RTVFmt = m_rpEyeSwapchainViews[ 0 ].front()->GetDesc().Format;
+	rendererCi.DSVFmt = m_rpEyeDepthViews[ 0 ].front()->GetDesc().Format;
+	rendererCi.AllowDebugView = true;
+	rendererCi.UseIBL = true;
+	rendererCi.FrontCCW = true;
+	rendererCi.UseTextureAtals = true;
+	m_gltfRenderer = std::make_unique< GLTF_PBR_Renderer >(
+		m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), rendererCi );
+
+
+	CreateUniformBuffer( m_pGraphicsBinding->GetRenderDevice(), sizeof( CameraAttribs ), "Camera attribs buffer", &m_CameraAttribsCB );
+	CreateUniformBuffer( m_pGraphicsBinding->GetRenderDevice(), sizeof( LightAttribs ), "Light attribs buffer", &m_LightAttribsCB );
+	//	CreateUniformBuffer( m_pGraphicsBinding->GetRenderDevice(), sizeof( EnvMapRenderAttribs ), "Env map render attribs buffer", &m_EnvMapRenderAttribsCB );
+	// clang-format off
+	StateTransitionDesc Barriers[] =
+	{
+		{ m_CameraAttribsCB,        RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_CONSTANT_BUFFER, STATE_TRANSITION_FLAG_UPDATE_STATE },
+		{ m_LightAttribsCB,         RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_CONSTANT_BUFFER, STATE_TRANSITION_FLAG_UPDATE_STATE },
+		//		{m_EnvMapRenderAttribsCB,  RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_CONSTANT_BUFFER, STATE_TRANSITION_FLAG_UPDATE_STATE},
+		//		{EnvironmentMap,           RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_SHADER_RESOURCE, STATE_TRANSITION_FLAG_UPDATE_STATE}
+	};
+	// clang-format on
+	m_pGraphicsBinding->GetImmediateContext()->TransitionResourceStates( _countof( Barriers ), Barriers );
+}
+
+void XrAppBase::SetPbrEnvironmentMap( const std::string& environmentMapPath )
+{
+	RefCntAutoPtr<ITexture> environmentMap;
+	CreateTextureFromFile( environmentMapPath.c_str(), TextureLoadInfo { "Environment Map" }, m_pGraphicsBinding->GetRenderDevice(),
+		&environmentMap );
+	m_pEnvironmentMapSRV = environmentMap->GetDefaultView( TEXTURE_VIEW_SHADER_RESOURCE );
+	m_gltfRenderer->PrecomputeCubemaps( m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(),
+		m_pEnvironmentMapSRV );
+}
+
+

@@ -93,9 +93,11 @@ public:
 	virtual bool RenderEye( const XrView& view, Diligent::ITextureView* eyeBuffer, Diligent::ITextureView* depthBuffer ) = 0;
 
 	std::unique_ptr<Diligent::GLTF::Model> LoadGltfModel( const std::string& path );
+	void SetPbrEnvironmentMap( const std::string& environmentMapPath );
 
 protected:
 	void CreateGLTFResourceCache();
+	void CreateGltfRenderer();
 
 	Diligent::float4x4							  m_ViewToProj;
 
@@ -107,8 +109,11 @@ protected:
 
 	Diligent::RefCntAutoPtr<Diligent::GLTF::ResourceManager> m_pResourceMgr;
 	Diligent::GLTF::ResourceCacheUseInfo           m_CacheUseInfo;
-
 	Diligent::GLTF_PBR_Renderer::ResourceCacheBindings m_CacheBindings;
+	std::unique_ptr< Diligent::GLTF_PBR_Renderer > m_gltfRenderer;
+	Diligent::RefCntAutoPtr<Diligent::ITextureView> m_pEnvironmentMapSRV;
+	Diligent::RefCntAutoPtr<Diligent::IBuffer>                m_CameraAttribsCB;
+	Diligent::RefCntAutoPtr<Diligent::IBuffer>                m_LightAttribsCB;
 
 	XrInstance m_instance = XR_NULL_HANDLE;
 	XrSystemId m_systemId = XR_NULL_SYSTEM_ID;
