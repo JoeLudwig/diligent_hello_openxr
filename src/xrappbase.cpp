@@ -42,6 +42,7 @@
 #include "Graphics/GraphicsEngineVulkan/interface/EngineFactoryVk.h"
 
 #include "Graphics/GraphicsTools/interface/MapHelper.hpp"
+#include <AssetLoader/interface/GLTFLoader.hpp>
 
  // Make sure the supported OpenXR graphics APIs are defined
 #if D3D11_SUPPORTED
@@ -237,6 +238,8 @@ bool XrAppBase::Initialize( HWND hWnd )
 		return false;
 		break;
 	}
+
+	CreateGLTFResourceCache();
 
 	if ( !PreSession() )
 		return false;
@@ -704,3 +707,73 @@ bool XrAppBase::RunXrFrame( XrTime *displayTime )
 }
 
 
+void XrAppBase::CreateGLTFResourceCache()
+{
+	std::array<BufferSuballocatorCreateInfo, 3> Buffers = {};
+
+	Buffers[ 0 ].Desc.Name = "GLTF basic vertex attribs buffer";
+	Buffers[ 0 ].Desc.BindFlags = BIND_VERTEX_BUFFER;
+	Buffers[ 0 ].Desc.Usage = USAGE_DEFAULT;
+	Buffers[ 0 ].Desc.uiSizeInBytes = sizeof( GLTF::Model::VertexBasicAttribs ) * 16 << 10;
+
+	Buffers[ 1 ].Desc.Name = "GLTF skin attribs buffer";
+	Buffers[ 1 ].Desc.BindFlags = BIND_VERTEX_BUFFER;
+	Buffers[ 1 ].Desc.Usage = USAGE_DEFAULT;
+	Buffers[ 1 ].Desc.uiSizeInBytes = sizeof( GLTF::Model::VertexSkinAttribs ) * 16 << 10;
+
+	Buffers[ 2 ].Desc.Name = "GLTF index buffer";
+	Buffers[ 2 ].Desc.BindFlags = BIND_INDEX_BUFFER;
+	Buffers[ 2 ].Desc.Usage = USAGE_DEFAULT;
+	Buffers[ 2 ].Desc.uiSizeInBytes = sizeof( Uint32 ) * 8 << 10;
+
+	std::array<DynamicTextureAtlasCreateInfo, 1> Atlases;
+	Atlases[ 0 ].Desc.Name = "GLTF texture atlas";
+	Atlases[ 0 ].Desc.Type = RESOURCE_DIM_TEX_2D_ARRAY;
+	Atlases[ 0 ].Desc.Usage = USAGE_DEFAULT;
+	Atlases[ 0 ].Desc.BindFlags = BIND_SHADER_RESOURCE;
+	Atlases[ 0 ].Desc.Format = TEX_FORMAT_RGBA8_UNORM;
+	Atlases[ 0 ].Desc.Width = 4096;
+	Atlases[ 0 ].Desc.Height = 4096;
+	Atlases[ 0 ].Desc.MipLevels = 6;
+
+	GLTF::ResourceManager::CreateInfo ResourceMgrCI;
+	ResourceMgrCI.BuffSuballocators = Buffers.data();
+	ResourceMgrCI.NumBuffSuballocators = static_cast<Uint32>( Buffers.size() );
+	ResourceMgrCI.TexAtlases = Atlases.data();
+	ResourceMgrCI.NumTexAtlases = static_cast<Uint32>( Atlases.size() );
+
+	ResourceMgrCI.DefaultAtlasDesc.Desc.Type = RESOURCE_DIM_TEX_2D_ARRAY;
+	ResourceMgrCI.DefaultAtlasDesc.Desc.Usage = USAGE_DEFAULT;
+	ResourceMgrCI.DefaultAtlasDesc.Desc.BindFlags = BIND_SHADER_RESOURCE;
+	ResourceMgrCI.DefaultAtlasDesc.Desc.Width = 4096;
+	ResourceMgrCI.DefaultAtlasDesc.Desc.Height = 4096;
+	ResourceMgrCI.DefaultAtlasDesc.Desc.MipLevels = 6;
+
+	m_pResourceMgr = GLTF::ResourceManager::Create( m_pGraphicsBinding->GetRenderDevice(), ResourceMgrCI );
+
+	m_CacheUseInfo.pResourceMgr = m_pResourceMgr;
+	m_CacheUseInfo.VertexBuffer0Idx = 0;
+	m_CacheUseInfo.VertexBuffer1Idx = 1;
+	m_CacheUseInfo.IndexBufferIdx = 2;
+
+	m_CacheUseInfo.BaseColorFormat = TEX_FORMAT_RGBA8_UNORM;
+	m_CacheUseInfo.PhysicalDescFormat = TEX_FORMAT_RGBA8_UNORM;
+	m_CacheUseInfo.NormalFormat = TEX_FORMAT_RGBA8_UNORM;
+	m_CacheUseInfo.OcclusionFormat = TEX_FORMAT_RGBA8_UNORM;
+	m_CacheUseInfo.EmissiveFormat = TEX_FORMAT_RGBA8_UNORM;
+}
+
+
+
+std::unique_ptr<GLTF::Model> XrAppBase::LoadGltfModel( const std::string& path )
+{
+	GLTF::Model::CreateInfo ci;
+	ci.FileName = path.c_str();
+	ci.LoadAnimationAndSkin = true;
+	ci.pCacheInfo = &m_CacheUseInfo;
+
+	auto model = std::make_unique<GLTF::Model>(
+		m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), ci );
+
+	return model;
+}

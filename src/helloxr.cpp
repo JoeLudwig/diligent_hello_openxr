@@ -115,9 +115,13 @@
 #include "actions.h"
 #include "paths.h"
 
+namespace Diligent
+{
+#include <Shaders/Common/public/BasicStructures.fxh>
+};
+
 using namespace Diligent;
 
-#include <Shaders/Common/public/BasicStructures.fxh>
 
 typedef std::map< std::string, uint32_t > XrExtensionMap;
 
@@ -234,19 +238,13 @@ bool HelloXrApp::PostSession()
 
 	CHECK_XR_RESULT( m_handActionSet->SessionInit( m_session ) );
 
-	GLTF::Model::CreateInfo ci( "models/skinned_hand_left.glb" );
-	m_leftHandModel = std::make_unique<GLTF::Model>(
-		m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), ci );
-	ci.FileName = "models/skinned_hand_right.glb";
-	m_rightHandModel = std::make_unique<GLTF::Model>(
-		m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), ci );
-
 	GLTF_PBR_Renderer::CreateInfo rendererCi;
 	rendererCi.RTVFmt = m_rpEyeSwapchainViews[ 0 ].front()->GetDesc().Format;
 	rendererCi.DSVFmt = m_rpEyeDepthViews[ 0 ].front()->GetDesc().Format;
 	rendererCi.AllowDebugView = true;
 	rendererCi.UseIBL = true;
 	rendererCi.FrontCCW = true;
+	rendererCi.UseTextureAtals = true;
 	m_gltfRenderer = std::make_unique< GLTF_PBR_Renderer >( 
 		m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), rendererCi );
 
@@ -271,8 +269,8 @@ bool HelloXrApp::PostSession()
 	// clang-format on
 	m_pGraphicsBinding->GetImmediateContext()->TransitionResourceStates( _countof( Barriers ), Barriers );
 
-	m_leftModelResourceBindings = m_gltfRenderer->CreateResourceBindings( *m_leftHandModel, m_CameraAttribsCB, m_LightAttribsCB );
-	m_rightModelResourceBindings = m_gltfRenderer->CreateResourceBindings( *m_rightHandModel, m_CameraAttribsCB, m_LightAttribsCB );
+	m_leftHandModel = LoadGltfModel( "models/skinned_hand_left.glb" );
+	m_rightHandModel = LoadGltfModel( "models/skinned_hand_right.glb" );
 
 	return true;
 }
@@ -337,6 +335,9 @@ bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextu
 		CamAttribs->fFarPlaneZ = 10.f;
 	}
 
+	m_gltfRenderer->Begin( m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), 
+		m_CacheUseInfo, m_CacheBindings, m_CameraAttribsCB, m_LightAttribsCB );
+
 	// draw the hands if they're available
 	for ( int cube = 0; cube < 2; cube++ )
 	{
@@ -353,12 +354,12 @@ bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextu
 		if ( cube == 0 )
 		{
 			m_gltfRenderer->Render( m_pGraphicsBinding->GetImmediateContext(), *m_leftHandModel, renderInfo,
-				&m_leftModelResourceBindings );
+				nullptr, &m_CacheBindings );
 		}
 		else
 		{
 			m_gltfRenderer->Render( m_pGraphicsBinding->GetImmediateContext(), *m_rightHandModel, renderInfo,
-				&m_rightModelResourceBindings );
+				nullptr, &m_CacheBindings );
 		}
 		//{
 		//	// Map the buffer and write current world-view-projection matrix

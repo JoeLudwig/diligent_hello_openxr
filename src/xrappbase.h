@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <map>
 
 #ifndef PLATFORM_WIN32
 #	define PLATFORM_WIN32 1
@@ -44,6 +45,9 @@
 #include <openxr/openxr_platform.h>
 #include "graphics_utilities.h"
 #include "igraphicsbinding.h"
+
+#include <AssetLoader/interface/GLTFLoader.hpp>
+#include "GLTF_PBR_Renderer.hpp"
 
 #include "iapp.h"
 
@@ -88,7 +92,11 @@ public:
 	bool RunXrFrame( XrTime *displayTime );
 	virtual bool RenderEye( const XrView& view, Diligent::ITextureView* eyeBuffer, Diligent::ITextureView* depthBuffer ) = 0;
 
+	std::unique_ptr<Diligent::GLTF::Model> LoadGltfModel( const std::string& path );
+
 protected:
+	void CreateGLTFResourceCache();
+
 	Diligent::float4x4							  m_ViewToProj;
 
 	Diligent::RefCntAutoPtr<Diligent::ISwapChain>	 m_pSwapChain;
@@ -96,6 +104,11 @@ protected:
 	std::vector< Diligent::RefCntAutoPtr<Diligent::ITextureView> >  m_rpEyeDepthViews[ 2 ];
 	Diligent::RENDER_DEVICE_TYPE			m_DeviceType = Diligent::RENDER_DEVICE_TYPE_D3D11;
 	std::unique_ptr<IGraphicsBinding> m_pGraphicsBinding;
+
+	Diligent::RefCntAutoPtr<Diligent::GLTF::ResourceManager> m_pResourceMgr;
+	Diligent::GLTF::ResourceCacheUseInfo           m_CacheUseInfo;
+
+	Diligent::GLTF_PBR_Renderer::ResourceCacheBindings m_CacheBindings;
 
 	XrInstance m_instance = XR_NULL_HANDLE;
 	XrSystemId m_systemId = XR_NULL_SYSTEM_ID;
