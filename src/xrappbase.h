@@ -58,6 +58,7 @@
 	} \
 	while ( 0 );
 
+using Diligent::float4x4;
 
 class XrAppBase : public IApp
 {
@@ -90,7 +91,9 @@ public:
 	bool ShouldWait() const;
 
 	bool RunXrFrame( XrTime *displayTime );
-	virtual bool RenderEye( const XrView& view, Diligent::ITextureView* eyeBuffer, Diligent::ITextureView* depthBuffer ) = 0;
+	virtual bool RenderEye( int eye ) = 0;
+	virtual void UpdateEyeTransforms( float4x4 eyeToProj, float4x4 stageToEye, XrView& view ) {};
+
 
 	std::unique_ptr<Diligent::GLTF::Model> LoadGltfModel( const std::string& path );
 	void SetPbrEnvironmentMap( const std::string& environmentMapPath );
@@ -98,6 +101,7 @@ public:
 protected:
 	void CreateGLTFResourceCache();
 	void CreateGltfRenderer();
+	void UpdateGltfEyeTransforms( float4x4 eyeToProj, float4x4 stageToEye, XrView& view, float nearClip, float farClip );
 
 	Diligent::float4x4							  m_ViewToProj;
 

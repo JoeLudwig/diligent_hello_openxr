@@ -163,7 +163,8 @@ public:
 	void CreateVertexBuffer();
 	void CreateIndexBuffer();
 
-	virtual bool RenderEye( const XrView& view, ITextureView *eyeBuffer, ITextureView* depthBuffer ) override;
+	virtual bool RenderEye( int eye ) override;
+	virtual void UpdateEyeTransforms( float4x4 eyeToProj, float4x4 stageToEye, XrView& view ) override;
 
 private:
 	RefCntAutoPtr<IPipelineState>		 m_pPSO;
@@ -239,29 +240,17 @@ bool HelloXrApp::PostSession()
 	return true;
 }
 
-bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextureView* depthBuffer )
+void HelloXrApp::UpdateEyeTransforms( float4x4 eyeToProj, float4x4 stageToEye, XrView& view )
 {
-	// Clear the back buffer
-	const float ClearColor[] = { 1.f, 0.350f, 0.350f, 1.0f };
-	m_pGraphicsBinding->GetImmediateContext()->SetRenderTargets( 1, &eyeBuffer, depthBuffer, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
-	m_pGraphicsBinding->GetImmediateContext()->ClearRenderTarget( eyeBuffer, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
-	m_pGraphicsBinding->GetImmediateContext()->ClearDepthStencil( depthBuffer, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
-
-	float4x4 eyeToProj;
-	float4x4_CreateProjection( &eyeToProj, m_DeviceType, view.fov, 0.01f, 10.f );
-
+	// Map the buffer and write current world-view-projection matrix
+	MapHelper<float4x4> CBConstants( m_pGraphicsBinding->GetImmediateContext(), m_VSConstants, MAP_WRITE, MAP_FLAG_DISCARD );
+	*CBConstants = ( m_CubeToWorld * stageToEye * eyeToProj ).Transpose();
 	m_ViewToProj = eyeToProj;
+};
 
-	float4x4 eyeToStage = 
-		quaternionFromXrQuaternion( view.pose.orientation ).ToMatrix() * float4x4::Translation( vectorFromXrVector( view.pose.position ) );
-	float4x4 stageToEye = eyeToStage.Inverse();
 
-	{
-		// Map the buffer and write current world-view-projection matrix
-		MapHelper<float4x4> CBConstants( m_pGraphicsBinding->GetImmediateContext(), m_VSConstants, MAP_WRITE, MAP_FLAG_DISCARD );
-		*CBConstants = ( m_CubeToWorld * stageToEye * eyeToProj ).Transpose();
-	}
-
+bool HelloXrApp::RenderEye( int eye )
+{
 	// Bind vertex and index buffers
 	Uint32   offset = 0;
 	IBuffer* pBuffs[] = { m_CubeVertexBuffer };
@@ -281,24 +270,7 @@ bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextu
 	DrawAttrs.Flags = DRAW_FLAG_VERIFY_ALL;
 	m_pGraphicsBinding->GetImmediateContext()->DrawIndexed( DrawAttrs );
 
-	{
-		MapHelper<CameraAttribs> CamAttribs( m_pGraphicsBinding->GetImmediateContext(), m_CameraAttribsCB, 
-			MAP_WRITE, MAP_FLAG_DISCARD );
-
-		float4x4 stageToProj = stageToEye * eyeToProj;
-		CamAttribs->mProjT = eyeToProj.Transpose();
-		CamAttribs->mViewProjT = stageToProj.Transpose();
-		CamAttribs->mViewProjInvT = stageToProj.Inverse().Transpose();
-		CamAttribs->f4Position = float4( vectorFromXrVector( view.pose.position ), 1 );
-
-		float2 viewSize = { (float)m_views[ 0 ].recommendedImageRectWidth, (float)m_views[ 0 ].recommendedImageRectHeight };
-		CamAttribs->f4ViewportSize = { viewSize.x, viewSize.y, 1.f / viewSize.x, 1.f / viewSize.y };
-		CamAttribs->f2ViewportOrigin = { 0, 0 };
-		CamAttribs->fNearPlaneZ = 0.01f;
-		CamAttribs->fFarPlaneZ = 10.f;
-	}
-
-	m_gltfRenderer->Begin( m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), 
+	m_gltfRenderer->Begin( m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(),
 		m_CacheUseInfo, m_CacheBindings, m_CameraAttribsCB, m_LightAttribsCB );
 
 	// draw the hands if they're available
@@ -324,13 +296,6 @@ bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextu
 			m_gltfRenderer->Render( m_pGraphicsBinding->GetImmediateContext(), *m_rightHandModel, renderInfo,
 				nullptr, &m_CacheBindings );
 		}
-		//{
-		//	// Map the buffer and write current world-view-projection matrix
-		//	MapHelper<float4x4> CBConstants( m_pGraphicsBinding->GetImmediateContext(), m_VSConstants, MAP_WRITE, MAP_FLAG_DISCARD );
-		//	*CBConstants = ( m_handCubeToWorld[cube] * stageToEye * eyeToProj ).Transpose();
-		//}
-
-		//m_pGraphicsBinding->GetImmediateContext()->DrawIndexed( DrawAttrs );
 	}
 
 	return true;

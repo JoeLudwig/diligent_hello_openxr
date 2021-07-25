@@ -679,8 +679,32 @@ bool XrAppBase::RunXrFrame( XrTime *displayTime )
 		CHECK_XR_RESULT( xrLocateViews( m_session, &locateInfo, &viewState, 2, &viewCount, views ) );
 
 		// render
-		RenderEye( views[ 0 ], m_rpEyeSwapchainViews[ 0 ][ index ], m_rpEyeDepthViews[ 0 ][ index ] );
-		RenderEye( views[ 1 ], m_rpEyeSwapchainViews[ 1 ][ index ], m_rpEyeDepthViews[ 1 ][ index ] );
+		for ( uint32_t i = 0; i < 2; i++ )
+		{
+			static const float k_nearClip = 0.01f;
+			static const float k_farClip = 10.f;
+
+			float4x4 eyeToProj;
+			float4x4_CreateProjection( &eyeToProj, m_DeviceType, views[ i ].fov, k_nearClip, k_farClip );
+
+			m_ViewToProj = eyeToProj;
+
+			float4x4 eyeToStage = matrixFromPose( views[ i ].pose );
+			float4x4 stageToEye = eyeToStage.Inverse();
+
+			UpdateEyeTransforms( eyeToProj, stageToEye, views[ i ] );
+			UpdateGltfEyeTransforms( eyeToProj, stageToEye, views[ i ], k_nearClip, k_farClip );
+
+			// Clear the back buffer
+			auto& eyeBuffer = m_rpEyeSwapchainViews[ i ][ index ];
+			auto& depthBuffer = m_rpEyeDepthViews[ i ][ index ];
+			const float ClearColor[] = { 1.f, 0.350f, 0.350f, 1.0f };
+			m_pGraphicsBinding->GetImmediateContext()->SetRenderTargets( 1, &eyeBuffer, depthBuffer, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+			m_pGraphicsBinding->GetImmediateContext()->ClearRenderTarget( eyeBuffer, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+			m_pGraphicsBinding->GetImmediateContext()->ClearDepthStencil( depthBuffer, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
+
+			RenderEye( i );
+		}
 
 		// release the image we just rendered into
 		XrSwapchainImageReleaseInfo releaseInfo = { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
@@ -825,4 +849,22 @@ void XrAppBase::SetPbrEnvironmentMap( const std::string& environmentMapPath )
 		m_pEnvironmentMapSRV );
 }
 
+
+void XrAppBase::UpdateGltfEyeTransforms( float4x4 eyeToProj, float4x4 stageToEye, XrView& view, float nearClip, float farClip )
+{
+	MapHelper<CameraAttribs> CamAttribs( m_pGraphicsBinding->GetImmediateContext(), m_CameraAttribsCB,
+		MAP_WRITE, MAP_FLAG_DISCARD );
+
+	float4x4 stageToProj = stageToEye * eyeToProj;
+	CamAttribs->mProjT = eyeToProj.Transpose();
+	CamAttribs->mViewProjT = stageToProj.Transpose();
+	CamAttribs->mViewProjInvT = stageToProj.Inverse().Transpose();
+	CamAttribs->f4Position = float4( vectorFromXrVector( view.pose.position ), 1 );
+
+	float2 viewSize = { (float)m_views[ 0 ].recommendedImageRectWidth, (float)m_views[ 0 ].recommendedImageRectHeight };
+	CamAttribs->f4ViewportSize = { viewSize.x, viewSize.y, 1.f / viewSize.x, 1.f / viewSize.y };
+	CamAttribs->f2ViewportOrigin = { 0, 0 };
+	CamAttribs->fNearPlaneZ = nearClip;
+	CamAttribs->fFarPlaneZ = farClip;
+}
 
