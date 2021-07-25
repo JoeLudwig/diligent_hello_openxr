@@ -525,12 +525,12 @@ bool XrAppBase::ProcessCommandLine( const std::string& cmdLine )
 	}
 	else
 	{
-#if D3D12_SUPPORTED
+#if D3D11_SUPPORTED
+		m_DeviceType = RENDER_DEVICE_TYPE_D3D11;
+#elif D3D12_SUPPORTED
 		m_DeviceType = RENDER_DEVICE_TYPE_D3D12;
 #elif VULKAN_SUPPORTED
 		m_DeviceType = RENDER_DEVICE_TYPE_VULKAN;
-#elif D3D11_SUPPORTED
-		m_DeviceType = RENDER_DEVICE_TYPE_D3D11;
 #elif GL_SUPPORTED
 		m_DeviceType = RENDER_DEVICE_TYPE_GL;
 #endif
