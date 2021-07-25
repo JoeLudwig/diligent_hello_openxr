@@ -21,12 +21,18 @@ add_executable(HelloDiligentXr
 )
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT bar)
 
-target_compile_definitions( HelloDiligentXr PRIVATE _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING )
+target_compile_definitions( HelloDiligentXr 
+	PRIVATE 
+		_SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
+		NOMINMAX
+		)
 
 target_compile_options(HelloDiligentXr PRIVATE -DUNICODE -DENGINE_DLL)
 target_include_directories(HelloDiligentXr 
 PRIVATE 
 	"../thirdparty/DiligentEngine/DiligentCore"
+	"../thirdparty/DiligentEngine/DiligentFx"
+	"../thirdparty/DiligentEngine/DiligentTools"
 	"../thirdparty/OpenXR-SDK/include"
 
 	# for VulkanHeaders
@@ -43,6 +49,7 @@ PRIVATE
 #	Diligent-GraphicsEngineVk-shared
 	Diligent-Win32Platform
 	Diligent-Common
+	DiligentFX
 	openxr_loader
 	DXGI
 )

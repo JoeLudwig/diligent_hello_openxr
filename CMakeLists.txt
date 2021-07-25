@@ -5,6 +5,8 @@ project( DiligentHelloOpenXR VERSION 0.1.0
 set(NAME DiligentHelloOpenXR)
 
 add_subdirectory( thirdparty/DiligentEngine/DiligentCore )
+add_subdirectory( thirdparty/DiligentEngine/DiligentTools )
+add_subdirectory( thirdparty/DiligentEngine/DiligentFx )
 add_subdirectory( thirdparty/OpenXR-SDK )
 
 add_compile_options( "/std:c++17" )

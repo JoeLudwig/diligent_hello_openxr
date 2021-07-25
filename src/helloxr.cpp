@@ -70,7 +70,7 @@
 #include "Graphics/GraphicsEngineD3D12/interface/EngineFactoryD3D12.h"
 #include "Graphics/GraphicsEngineOpenGL/interface/EngineFactoryOpenGL.h"
 #include "Graphics/GraphicsEngineVulkan/interface/EngineFactoryVk.h"
-#include "Common/interface/BasicMath.hpp"
+#include "Common/interface/AdvancedMath.hpp"
 #include "Common/interface/Timer.hpp"
 
 #include "Graphics/GraphicsEngine/interface/RenderDevice.h"
@@ -80,7 +80,10 @@
 #include "Common/interface/RefCntAutoPtr.hpp"
 
 #include "Graphics/GraphicsTools/interface/MapHelper.hpp"
-
+#include "Graphics/GraphicsTools/interface/GraphicsUtilities.h"
+#include <AssetLoader/interface/GLTFLoader.hpp>
+#include "GLTF_PBR_Renderer.hpp"
+#include <TextureLoader/interface/TextureUtilities.h>
 #include "openxr/openxr.h"
 
 // Make sure the supported OpenXR graphics APIs are defined
@@ -114,6 +117,7 @@
 
 using namespace Diligent;
 
+#include <Shaders/Common/public/BasicStructures.fxh>
 
 typedef std::map< std::string, uint32_t > XrExtensionMap;
 
@@ -133,11 +137,10 @@ public:
 		}
 	}
 
-	bool Initialize(HWND hWnd)
+	bool Initialize( HWND hWnd )
 	{
 		if ( !super::Initialize( hWnd ) )
 			return false;
-
 
 		CreatePipelineState();
 		CreateVertexBuffer();
@@ -175,6 +178,15 @@ private:
 	XRDE::Action * m_hideCubeAction;
 	XRDE::Action * m_hapticAction;
 
+	std::unique_ptr<GLTF::Model> m_leftHandModel;
+	std::unique_ptr<GLTF::Model> m_rightHandModel;
+	std::unique_ptr< GLTF_PBR_Renderer > m_gltfRenderer;
+	RefCntAutoPtr<ITextureView> m_pEnvironmentMapSRV;
+
+	RefCntAutoPtr<IBuffer>                m_CameraAttribsCB;
+	RefCntAutoPtr<IBuffer>                m_LightAttribsCB;
+	GLTF_PBR_Renderer::ModelResourceBindings m_leftModelResourceBindings;
+	GLTF_PBR_Renderer::ModelResourceBindings m_rightModelResourceBindings;
 };
 
 
@@ -222,6 +234,46 @@ bool HelloXrApp::PostSession()
 
 	CHECK_XR_RESULT( m_handActionSet->SessionInit( m_session ) );
 
+	GLTF::Model::CreateInfo ci( "models/skinned_hand_left.glb" );
+	m_leftHandModel = std::make_unique<GLTF::Model>(
+		m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), ci );
+	ci.FileName = "models/skinned_hand_right.glb";
+	m_rightHandModel = std::make_unique<GLTF::Model>(
+		m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), ci );
+
+	GLTF_PBR_Renderer::CreateInfo rendererCi;
+	rendererCi.RTVFmt = m_rpEyeSwapchainViews[ 0 ].front()->GetDesc().Format;
+	rendererCi.DSVFmt = m_rpEyeDepthViews[ 0 ].front()->GetDesc().Format;
+	rendererCi.AllowDebugView = true;
+	rendererCi.UseIBL = true;
+	rendererCi.FrontCCW = true;
+	m_gltfRenderer = std::make_unique< GLTF_PBR_Renderer >( 
+		m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(), rendererCi );
+
+	RefCntAutoPtr<ITexture> environmentMap;
+	CreateTextureFromFile( "textures/papermill.ktx", TextureLoadInfo { "Environment Map" }, m_pGraphicsBinding->GetRenderDevice(),
+		&environmentMap );
+	m_pEnvironmentMapSRV = environmentMap->GetDefaultView( TEXTURE_VIEW_SHADER_RESOURCE );
+	m_gltfRenderer->PrecomputeCubemaps( m_pGraphicsBinding->GetRenderDevice(), m_pGraphicsBinding->GetImmediateContext(),
+		m_pEnvironmentMapSRV );
+
+	CreateUniformBuffer( m_pGraphicsBinding->GetRenderDevice(), sizeof( CameraAttribs ), "Camera attribs buffer", &m_CameraAttribsCB );
+	CreateUniformBuffer( m_pGraphicsBinding->GetRenderDevice(), sizeof( LightAttribs ), "Light attribs buffer", &m_LightAttribsCB );
+//	CreateUniformBuffer( m_pGraphicsBinding->GetRenderDevice(), sizeof( EnvMapRenderAttribs ), "Env map render attribs buffer", &m_EnvMapRenderAttribsCB );
+	// clang-format off
+	StateTransitionDesc Barriers[] =
+	{
+		{m_CameraAttribsCB,        RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_CONSTANT_BUFFER, STATE_TRANSITION_FLAG_UPDATE_STATE},
+		{m_LightAttribsCB,         RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_CONSTANT_BUFFER, STATE_TRANSITION_FLAG_UPDATE_STATE},
+//		{m_EnvMapRenderAttribsCB,  RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_CONSTANT_BUFFER, STATE_TRANSITION_FLAG_UPDATE_STATE},
+//		{EnvironmentMap,           RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_SHADER_RESOURCE, STATE_TRANSITION_FLAG_UPDATE_STATE}
+	};
+	// clang-format on
+	m_pGraphicsBinding->GetImmediateContext()->TransitionResourceStates( _countof( Barriers ), Barriers );
+
+	m_leftModelResourceBindings = m_gltfRenderer->CreateResourceBindings( *m_leftHandModel, m_CameraAttribsCB, m_LightAttribsCB );
+	m_rightModelResourceBindings = m_gltfRenderer->CreateResourceBindings( *m_rightHandModel, m_CameraAttribsCB, m_LightAttribsCB );
+
 	return true;
 }
 
@@ -268,6 +320,23 @@ bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextu
 	DrawAttrs.Flags = DRAW_FLAG_VERIFY_ALL;
 	m_pGraphicsBinding->GetImmediateContext()->DrawIndexed( DrawAttrs );
 
+	{
+		MapHelper<CameraAttribs> CamAttribs( m_pGraphicsBinding->GetImmediateContext(), m_CameraAttribsCB, 
+			MAP_WRITE, MAP_FLAG_DISCARD );
+
+		float4x4 stageToProj = stageToEye * eyeToProj;
+		CamAttribs->mProjT = eyeToProj.Transpose();
+		CamAttribs->mViewProjT = stageToProj.Transpose();
+		CamAttribs->mViewProjInvT = stageToProj.Inverse().Transpose();
+		CamAttribs->f4Position = float4( vectorFromXrVector( view.pose.position ), 1 );
+
+		float2 viewSize = { (float)m_views[ 0 ].recommendedImageRectWidth, (float)m_views[ 0 ].recommendedImageRectHeight };
+		CamAttribs->f4ViewportSize = { viewSize.x, viewSize.y, 1.f / viewSize.x, 1.f / viewSize.y };
+		CamAttribs->f2ViewportOrigin = { 0, 0 };
+		CamAttribs->fNearPlaneZ = 0.01f;
+		CamAttribs->fFarPlaneZ = 10.f;
+	}
+
 	// draw the hands if they're available
 	for ( int cube = 0; cube < 2; cube++ )
 	{
@@ -277,13 +346,27 @@ bool HelloXrApp::RenderEye( const XrView & view, ITextureView *eyeBuffer, ITextu
 		if ( m_hideCube[ cube ] )
 			continue;
 
-		{
-			// Map the buffer and write current world-view-projection matrix
-			MapHelper<float4x4> CBConstants( m_pGraphicsBinding->GetImmediateContext(), m_VSConstants, MAP_WRITE, MAP_FLAG_DISCARD );
-			*CBConstants = ( m_handCubeToWorld[cube] * stageToEye * eyeToProj ).Transpose();
-		}
+		GLTF_PBR_Renderer::RenderInfo renderInfo;
+		renderInfo.ModelTransform = /*float4x4::RotationX( (float) PI ) **/ float4x4::RotationY( (float)PI ) 
+			* m_handCubeToWorld[ cube ];
 
-		m_pGraphicsBinding->GetImmediateContext()->DrawIndexed( DrawAttrs );
+		if ( cube == 0 )
+		{
+			m_gltfRenderer->Render( m_pGraphicsBinding->GetImmediateContext(), *m_leftHandModel, renderInfo,
+				&m_leftModelResourceBindings );
+		}
+		else
+		{
+			m_gltfRenderer->Render( m_pGraphicsBinding->GetImmediateContext(), *m_rightHandModel, renderInfo,
+				&m_rightModelResourceBindings );
+		}
+		//{
+		//	// Map the buffer and write current world-view-projection matrix
+		//	MapHelper<float4x4> CBConstants( m_pGraphicsBinding->GetImmediateContext(), m_VSConstants, MAP_WRITE, MAP_FLAG_DISCARD );
+		//	*CBConstants = ( m_handCubeToWorld[cube] * stageToEye * eyeToProj ).Transpose();
+		//}
+
+		//m_pGraphicsBinding->GetImmediateContext()->DrawIndexed( DrawAttrs );
 	}
 
 	return true;
@@ -525,7 +608,7 @@ void HelloXrApp::Update( double CurrTime, double ElapsedTime, XrTime displayTime
 	if( XR_SUCCEEDED( m_handAction->LocateSpace( m_stageSpace, displayTime, Paths().userHandLeft, &spaceLocation ) ) 
 		&& ( spaceLocation.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT ) != 0 )
 	{
-		m_handCubeToWorld[0] = float4x4::Scale( 0.05f ) * matrixFromPose( spaceLocation.pose );
+		m_handCubeToWorld[0] = matrixFromPose( spaceLocation.pose );
 		m_handCubeToWorldValid[ 0 ] = true;
 	}
 	else
@@ -535,7 +618,7 @@ void HelloXrApp::Update( double CurrTime, double ElapsedTime, XrTime displayTime
 	if ( XR_SUCCEEDED( m_handAction->LocateSpace( m_stageSpace, displayTime, Paths().userHandRight, &spaceLocation ) )
 		&& ( spaceLocation.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT ) != 0 )
 	{
-		m_handCubeToWorld[ 1 ] = float4x4::Scale( 0.05f ) * matrixFromPose( spaceLocation.pose );
+		m_handCubeToWorld[ 1 ] = matrixFromPose( spaceLocation.pose );
 		m_handCubeToWorldValid[ 1 ] = true;
 	}
 	else
