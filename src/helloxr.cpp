@@ -158,6 +158,7 @@ public:
 	virtual void Update( double currTime, double elapsedTime, XrTime displayTime ) override;
 	virtual bool PreSession() override;
 	virtual bool PostSession() override;
+	virtual std::vector<std::string> GetDesiredExtensions();
 
 	void CreatePipelineState();
 	void CreateVertexBuffer();
@@ -187,6 +188,16 @@ private:
 	std::unique_ptr<GLTF::Model> m_rightHandModel;
 };
 
+
+std::vector<std::string> HelloXrApp::GetDesiredExtensions() 
+{ 
+	return 
+	{
+		XR_EXT_HAND_TRACKING_EXTENSION_NAME,
+		XR_EXT_HP_MIXED_REALITY_CONTROLLER_EXTENSION_NAME,
+		XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME,
+	}; 
+}
 
 
 using namespace XRDE;

@@ -60,6 +60,8 @@
 
 using Diligent::float4x4;
 
+typedef std::map< std::string, uint32_t > XrExtensionMap;
+
 class XrAppBase : public IApp
 {
 public:
@@ -74,8 +76,9 @@ public:
 	bool CreateSession();
 	virtual bool ProcessCommandLine( const std::string& cmdLine ) override;
 	virtual void RunMainFrame() override;
-	virtual bool PreSession() {	return true; }
+	virtual bool PreSession() { return true; }
 	virtual bool PostSession() { return true; }
+	virtual std::vector<std::string> GetDesiredExtensions() { return {}; };
 
 	virtual void Render() = 0;
 	virtual void Update( double currTime, double elapsedTime, XrTime displayTime ) = 0;
@@ -94,6 +97,7 @@ public:
 	virtual bool RenderEye( int eye ) = 0;
 	virtual void UpdateEyeTransforms( float4x4 eyeToProj, float4x4 stageToEye, XrView& view ) {};
 
+	bool IsExtensionActive( const std::string& extensionName );
 
 	std::unique_ptr<Diligent::GLTF::Model> LoadGltfModel( const std::string& path );
 	void SetPbrEnvironmentMap( const std::string& environmentMapPath );
@@ -127,6 +131,9 @@ protected:
 	XrSwapchain m_depthSwapchain = XR_NULL_HANDLE;
 	XrSpace m_stageSpace = XR_NULL_HANDLE;
 	XrSessionState m_sessionState = XR_SESSION_STATE_UNKNOWN;
+	XrExtensionMap m_availableExtensions;
+	XrExtensionMap m_activeExtensions;
+	bool m_submitDepthLayer = false;
 
 	Diligent::Timer m_frameTimer;
 	double m_prevFrameTime = 0;

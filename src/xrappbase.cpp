@@ -83,8 +83,6 @@ namespace Diligent
 using namespace Diligent;
 
 
-typedef std::map< std::string, uint32_t > XrExtensionMap;
-
 XrExtensionMap GetAvailableOpenXRExtensions()
 {
 	uint32_t neededSize = 0;
@@ -265,47 +263,20 @@ bool XrAppBase::Initialize( HWND hWnd )
 
 bool XrAppBase::InitializeOpenXr()
 {
-	XrExtensionMap availableExtensions = GetAvailableOpenXRExtensions();
+	m_availableExtensions = GetAvailableOpenXRExtensions();
 
 	std::vector< std::string > xrExtensions = m_pGraphicsBinding->GetXrExtensions();
 
-	//		switch ( m_DeviceType )
-	//		{
-	//#if D3D11_SUPPORTED
-	//		case RENDER_DEVICE_TYPE_D3D11:
-	//		{
-	//			xrExtensions.push_back( XR_KHR_D3D11_ENABLE_EXTENSION_NAME );
-	//		}
-	//		break;
-	//#endif
-	//
-	//
-	//#if D3D12_SUPPORTED
-	//		case RENDER_DEVICE_TYPE_D3D12:
-	//		{
-	//			xrExtensions.push_back( XR_KHR_D3D12_ENABLE_EXTENSION_NAME );
-	//		}
-	//		break;
-	//#endif
-	//
-	//
-	//#if GL_SUPPORTED
-	//		case RENDER_DEVICE_TYPE_GL:
-	//		{
-	//			xrExtensions.push_back( XR_KHR_OPENGL_ENABLE_EXTENSION_NAME );
-	//		}
-	//		break;
-	//#endif
-	//
-	//
-	//#if VULKAN_SUPPORTED
-	//		case RENDER_DEVICE_TYPE_VULKAN:
-	//		{
-	//			xrExtensions.push_back( XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME );
-	//		}
-	//		break;
-	//#endif
-	//		}
+	std::vector< std::string > desiredExtensions = GetDesiredExtensions();
+	for ( auto& ext : desiredExtensions )
+	{
+		auto i = m_availableExtensions.find( ext );
+		if ( i != m_availableExtensions.end() )
+		{
+			xrExtensions.push_back( ext );
+			m_activeExtensions.insert( std::make_pair( i->first, i->second ) );
+		}
+	}
 
 	if ( xrExtensions.empty() )
 	{
@@ -357,8 +328,16 @@ bool XrAppBase::InitializeOpenXr()
 		return false;
 	}
 
+	m_submitDepthLayer = IsExtensionActive( XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME );
 	return XR_SUCCEEDED( res );
 }
+
+
+bool XrAppBase::IsExtensionActive( const std::string& extensionName )
+{
+	return m_activeExtensions.find( extensionName ) != m_activeExtensions.end();
+}
+
 
 bool XrAppBase::CreateSession()
 {
@@ -660,13 +639,15 @@ bool XrAppBase::RunXrFrame( XrTime *displayTime )
 	{
 		// acquire the image index for this swapchain
 		XrSwapchainImageAcquireInfo acquireInfo = { XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
-		uint32_t index;
+		uint32_t index, depthIndex;
 		CHECK_XR_RESULT( xrAcquireSwapchainImage( m_swapchain, &acquireInfo, &index ) );
+		CHECK_XR_RESULT( xrAcquireSwapchainImage( m_depthSwapchain, &acquireInfo, &depthIndex ) );
 
 		// wait for swap chains
 		XrSwapchainImageWaitInfo waitInfo = { XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
 		waitInfo.timeout = 999999;
 		CHECK_XR_RESULT( xrWaitSwapchainImage( m_swapchain, &waitInfo ) );
+		CHECK_XR_RESULT( xrWaitSwapchainImage( m_depthSwapchain, &waitInfo ) );
 
 		XrViewLocateInfo locateInfo = { XR_TYPE_VIEW_LOCATE_INFO };
 		locateInfo.displayTime = frameState.predictedDisplayTime;
@@ -678,11 +659,12 @@ bool XrAppBase::RunXrFrame( XrTime *displayTime )
 		uint32_t viewCount;
 		CHECK_XR_RESULT( xrLocateViews( m_session, &locateInfo, &viewState, 2, &viewCount, views ) );
 
+		static const float k_nearClip = 0.01f;
+		static const float k_farClip = 10.f;
+
 		// render
 		for ( uint32_t i = 0; i < 2; i++ )
 		{
-			static const float k_nearClip = 0.01f;
-			static const float k_farClip = 10.f;
 
 			float4x4 eyeToProj;
 			float4x4_CreateProjection( &eyeToProj, m_DeviceType, views[ i ].fov, k_nearClip, k_farClip );
@@ -697,7 +679,7 @@ bool XrAppBase::RunXrFrame( XrTime *displayTime )
 
 			// Clear the back buffer
 			auto& eyeBuffer = m_rpEyeSwapchainViews[ i ][ index ];
-			auto& depthBuffer = m_rpEyeDepthViews[ i ][ index ];
+			auto& depthBuffer = m_rpEyeDepthViews[ i ][ depthIndex ];
 			const float ClearColor[] = { 1.f, 0.350f, 0.350f, 1.0f };
 			m_pGraphicsBinding->GetImmediateContext()->SetRenderTargets( 1, &eyeBuffer, depthBuffer, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 			m_pGraphicsBinding->GetImmediateContext()->ClearRenderTarget( eyeBuffer, ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
@@ -709,7 +691,9 @@ bool XrAppBase::RunXrFrame( XrTime *displayTime )
 		// release the image we just rendered into
 		XrSwapchainImageReleaseInfo releaseInfo = { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
 		CHECK_XR_RESULT( xrReleaseSwapchainImage( m_swapchain, &releaseInfo ) );
+		CHECK_XR_RESULT( xrReleaseSwapchainImage( m_depthSwapchain, &releaseInfo ) );
 
+		XrCompositionLayerDepthInfoKHR depthLayers[ 2 ] = { { XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR }, { XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR } };
 		for ( uint32_t i = 0; i < 2; i++ )
 		{
 			projectionViews[ i ].fov = views[ i ].fov;
@@ -724,6 +708,18 @@ bool XrAppBase::RunXrFrame( XrTime *displayTime )
 					(int32_t)m_views[ 0 ].recommendedImageRectHeight
 				}
 			};
+
+			if ( m_submitDepthLayer )
+			{
+				projectionViews[ i ].next = &depthLayers[ i ];
+				depthLayers[ i ].minDepth = 0.f;
+				depthLayers[ i ].maxDepth = 1.f;
+				depthLayers[ i ].nearZ = k_nearClip;
+				depthLayers[ i ].farZ = k_farClip;
+				depthLayers[ i ].subImage.imageArrayIndex = i;
+				depthLayers[ i ].subImage.imageRect = projectionViews[ i ].subImage.imageRect;
+				depthLayers[ i ].subImage.swapchain = m_depthSwapchain;
+			}
 		}
 
 		projectionLayer.space = m_stageSpace;
