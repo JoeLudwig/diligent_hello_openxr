@@ -318,6 +318,21 @@ bool XrAppBase::InitializeOpenXr()
 		return false;
 	}
 
+	XrSystemHandTrackingPropertiesEXT handTrackingProperties = { XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT };
+	if ( IsExtensionActive( XR_EXT_HAND_TRACKING_EXTENSION_NAME ) )
+	{
+		m_systemProperties.next = &handTrackingProperties;
+	}
+
+	CHECK_XR_RESULT( xrGetSystemProperties( m_instance, m_systemId, &m_systemProperties ) );
+
+	if ( IsExtensionActive( XR_EXT_HAND_TRACKING_EXTENSION_NAME ) )
+	{
+		// Don't leave this land mine from the stack on this member variable
+		m_systemProperties.next = nullptr;
+		m_enableHandTrackers = true;
+	}
+
 	m_views[ 0 ].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
 	m_views[ 1 ].type = XR_TYPE_VIEW_CONFIGURATION_VIEW;
 
@@ -448,6 +463,21 @@ bool XrAppBase::CreateSession()
 	spaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
 	spaceCreateInfo.poseInReferenceSpace = IdentityXrPose();
 	CHECK_XR_RESULT( xrCreateReferenceSpace( m_session, &spaceCreateInfo, &m_stageSpace ) );
+
+	if ( m_enableHandTrackers )
+	{
+		XrHandTrackerCreateInfoEXT handTrackerCreateInfo = { XR_TYPE_HAND_TRACKER_CREATE_INFO_EXT };
+		handTrackerCreateInfo.hand = XR_HAND_LEFT_EXT;
+		handTrackerCreateInfo.handJointSet = XR_HAND_JOINT_SET_DEFAULT_EXT;
+
+		FETCH_AND_DEFINE_XR_FUNCTION( m_instance, xrCreateHandTrackerEXT );
+
+		CHECK_XR_RESULT( xrCreateHandTrackerEXT( m_session, &handTrackerCreateInfo, &m_handTrackers[ 0 ] ) );
+		handTrackerCreateInfo.hand = XR_HAND_RIGHT_EXT;
+		CHECK_XR_RESULT( xrCreateHandTrackerEXT( m_session, &handTrackerCreateInfo, &m_handTrackers[ 1 ] ) );
+
+		xrGetInstanceProcAddr( m_instance, "xrLocateHandJointsEXT", (PFN_xrVoidFunction*)&m_xrLocateHandJointsEXT );
+	}
 
 	return true;
 }

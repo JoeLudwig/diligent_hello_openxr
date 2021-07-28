@@ -166,6 +166,7 @@ public:
 
 	virtual bool RenderEye( int eye ) override;
 	virtual void UpdateEyeTransforms( float4x4 eyeToProj, float4x4 stageToEye, XrView& view ) override;
+	void UpdateHandPoses( XrHandTrackerEXT handTracker, GLTF::Model* model, XrTime displayTime );
 
 private:
 	RefCntAutoPtr<IPipelineState>		 m_pPSO;
@@ -195,7 +196,7 @@ std::vector<std::string> HelloXrApp::GetDesiredExtensions()
 	{
 		XR_EXT_HAND_TRACKING_EXTENSION_NAME,
 		XR_EXT_HP_MIXED_REALITY_CONTROLLER_EXTENSION_NAME,
-		XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME,
+//		XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME,
 	}; 
 }
 
@@ -245,8 +246,8 @@ bool HelloXrApp::PostSession()
 
 	SetPbrEnvironmentMap( "textures/papermill.ktx" );
 
-	m_leftHandModel = LoadGltfModel( "models/skinned_hand_left.glb" );
-	m_rightHandModel = LoadGltfModel( "models/skinned_hand_right.glb" );
+	m_leftHandModel = LoadGltfModel( "models/valve_hand_models/left_hand.glb" );
+	m_rightHandModel = LoadGltfModel( "models/valve_hand_models/right_hand.glb" );
 
 	return true;
 }
@@ -290,12 +291,11 @@ bool HelloXrApp::RenderEye( int eye )
 		if ( !m_handCubeToWorldValid[ cube ] )
 			continue;
 
-		if ( m_hideCube[ cube ] )
-			continue;
+		//if ( m_hideCube[ cube ] )
+		//	continue;
 
 		GLTF_PBR_Renderer::RenderInfo renderInfo;
-		renderInfo.ModelTransform = /*float4x4::RotationX( (float) PI ) **/ float4x4::RotationY( (float)PI ) 
-			* m_handCubeToWorld[ cube ];
+		renderInfo.ModelTransform = float4x4::Identity();// m_handCubeToWorld[ cube ];
 
 		if ( cube == 0 )
 		{
@@ -591,9 +591,130 @@ void HelloXrApp::Update( double CurrTime, double ElapsedTime, XrTime displayTime
 		* float4x4::RotationY( static_cast<float>( CurrTime ) * 1.0f ) 
 		* float4x4::RotationX( -PI_F * 0.1f );
 
-
+	UpdateHandPoses( m_handTrackers[ 0 ], m_leftHandModel.get(), displayTime );
+	UpdateHandPoses( m_handTrackers[ 1 ], m_rightHandModel.get(), displayTime );
 }
 
+XrHandJointEXT GetParentJoint( XrHandJointEXT joint )
+{
+	switch ( joint )
+	{
+		case XR_HAND_JOINT_PALM_EXT: return XR_HAND_JOINT_WRIST_EXT;
+		case XR_HAND_JOINT_WRIST_EXT: return XR_HAND_JOINT_WRIST_EXT;
+		case XR_HAND_JOINT_THUMB_METACARPAL_EXT: return XR_HAND_JOINT_WRIST_EXT;
+		case XR_HAND_JOINT_THUMB_PROXIMAL_EXT: return XR_HAND_JOINT_THUMB_METACARPAL_EXT;
+		case XR_HAND_JOINT_THUMB_DISTAL_EXT: return XR_HAND_JOINT_THUMB_PROXIMAL_EXT;
+		case XR_HAND_JOINT_THUMB_TIP_EXT: return XR_HAND_JOINT_THUMB_DISTAL_EXT;
+		case XR_HAND_JOINT_INDEX_METACARPAL_EXT: return XR_HAND_JOINT_WRIST_EXT;
+		case XR_HAND_JOINT_INDEX_PROXIMAL_EXT: return XR_HAND_JOINT_INDEX_METACARPAL_EXT;
+		case XR_HAND_JOINT_INDEX_INTERMEDIATE_EXT: return XR_HAND_JOINT_INDEX_PROXIMAL_EXT;
+		case XR_HAND_JOINT_INDEX_DISTAL_EXT: return XR_HAND_JOINT_INDEX_INTERMEDIATE_EXT;
+		case XR_HAND_JOINT_INDEX_TIP_EXT: return XR_HAND_JOINT_INDEX_DISTAL_EXT;
+		case XR_HAND_JOINT_MIDDLE_METACARPAL_EXT: return XR_HAND_JOINT_WRIST_EXT;
+		case XR_HAND_JOINT_MIDDLE_PROXIMAL_EXT: return XR_HAND_JOINT_MIDDLE_METACARPAL_EXT;
+		case XR_HAND_JOINT_MIDDLE_INTERMEDIATE_EXT: return XR_HAND_JOINT_MIDDLE_PROXIMAL_EXT;
+		case XR_HAND_JOINT_MIDDLE_DISTAL_EXT: return XR_HAND_JOINT_MIDDLE_INTERMEDIATE_EXT;
+		case XR_HAND_JOINT_MIDDLE_TIP_EXT: return XR_HAND_JOINT_MIDDLE_DISTAL_EXT;
+		case XR_HAND_JOINT_RING_METACARPAL_EXT: return XR_HAND_JOINT_WRIST_EXT;
+		case XR_HAND_JOINT_RING_PROXIMAL_EXT: return XR_HAND_JOINT_RING_METACARPAL_EXT;
+		case XR_HAND_JOINT_RING_INTERMEDIATE_EXT: return XR_HAND_JOINT_RING_PROXIMAL_EXT;
+		case XR_HAND_JOINT_RING_DISTAL_EXT: return XR_HAND_JOINT_RING_INTERMEDIATE_EXT;
+		case XR_HAND_JOINT_RING_TIP_EXT: return XR_HAND_JOINT_RING_DISTAL_EXT;
+		case XR_HAND_JOINT_LITTLE_METACARPAL_EXT: return XR_HAND_JOINT_WRIST_EXT;
+		case XR_HAND_JOINT_LITTLE_PROXIMAL_EXT: return XR_HAND_JOINT_LITTLE_METACARPAL_EXT;
+		case XR_HAND_JOINT_LITTLE_INTERMEDIATE_EXT: return XR_HAND_JOINT_LITTLE_PROXIMAL_EXT;
+		case XR_HAND_JOINT_LITTLE_DISTAL_EXT: return XR_HAND_JOINT_LITTLE_INTERMEDIATE_EXT;
+		case XR_HAND_JOINT_LITTLE_TIP_EXT: return XR_HAND_JOINT_LITTLE_DISTAL_EXT;
+
+		default:
+			return XR_HAND_JOINT_MAX_ENUM_EXT;
+	}
+}
+
+uint32_t JointIndexFromHandJoint( XrHandJointEXT handJoint )
+{
+	if ( handJoint == XR_HAND_JOINT_PALM_EXT )
+	{
+		return 25;
+	}
+	else
+	{
+		return handJoint - 1;
+	}
+}
+
+
+void HelloXrApp::UpdateHandPoses( XrHandTrackerEXT handTracker, GLTF::Model* model, XrTime displayTime )
+{
+	if ( !m_enableHandTrackers )
+		return;
+
+	XrHandJointsLocateInfoEXT locateInfo = { XR_TYPE_HAND_JOINTS_LOCATE_INFO_EXT };
+	locateInfo.time = displayTime;
+	locateInfo.baseSpace = m_stageSpace;
+
+	XrHandJointLocationEXT jointLocations[ XR_HAND_JOINT_COUNT_EXT ];
+	XrHandJointLocationsEXT locations = { XR_TYPE_HAND_JOINT_LOCATIONS_EXT };
+	locations.jointCount = XR_HAND_JOINT_COUNT_EXT;
+	locations.jointLocations = jointLocations;
+	XrResult res = m_xrLocateHandJointsEXT( handTracker, &locateInfo, &locations );
+	if ( XR_FAILED( res ) )
+		return;
+
+	if ( !locations.isActive )
+		return;
+
+	float4x4 jointsToParent[ XR_HAND_JOINT_COUNT_EXT ];
+	float4x4 stageToJoint[ XR_HAND_JOINT_COUNT_EXT ];
+
+	// pre-load the wrist because the palm is out of order and earlier in the enum
+	jointsToParent[ XR_HAND_JOINT_WRIST_EXT ] = matrixFromPose( jointLocations[ XR_HAND_JOINT_WRIST_EXT ].pose );
+	stageToJoint[ XR_HAND_JOINT_WRIST_EXT ] = jointsToParent[ XR_HAND_JOINT_WRIST_EXT ].Inverse();
+	for ( uint32_t jointIndex = 0; jointIndex < XR_HAND_JOINT_COUNT_EXT; jointIndex++ )
+	{
+		if ( jointIndex == XR_HAND_JOINT_WRIST_EXT )
+			continue;
+
+		float4x4 jointToStage = matrixFromPose( jointLocations[ jointIndex ].pose );
+		//float4x4 jointToStage = Diligent::float4x4::Translation( vectorFromXrVector( jointLocations[ jointIndex ].pose.position ) );
+		stageToJoint[ jointIndex ] = jointToStage.Inverse();
+
+		XrHandJointEXT parentJoint = GetParentJoint( ( XrHandJointEXT)jointIndex );
+		if ( parentJoint == jointIndex )
+		{
+			// this joint has no parent, so its parent is the stage
+			jointsToParent[ jointIndex ] = jointToStage;
+		}
+		else
+		{
+			jointsToParent[ jointIndex ] = jointToStage * stageToJoint[ parentJoint ];
+		}
+	}
+
+	for ( auto& skin : model->Skins )
+	{
+		skin->Joints[ 0 ]->Translation = vectorFromXrVector( jointLocations[ 0 ].pose.position );
+		skin->Joints[ 0 ]->Rotation = quaternionFromXrQuaternion( jointLocations[ 0 ].pose.orientation);
+		for ( uint32_t handJoint = 0; handJoint < 26; handJoint++ )
+		{
+			//if ( handJoint > XR_HAND_JOINT_THUMB_TIP_EXT )
+			//	break;
+
+			uint32_t jointIndex = JointIndexFromHandJoint( (XrHandJointEXT)handJoint );
+
+			GLTF::Node* node = skin->Joints[ jointIndex ];
+			node->Matrix = jointsToParent[ handJoint ];
+			node->Rotation = Quaternion( 0, 0, 0, 1.f );
+			node->Translation = { 0, 0, 0 };
+			node->Scale = { 1.f, 1.f, 1.f };
+		}
+	}
+
+	for ( auto& root_node : model->Nodes )
+	{
+		root_node->UpdateTransforms();
+	}
+}
 
 std::unique_ptr<HelloXrApp> g_pTheApp;
 

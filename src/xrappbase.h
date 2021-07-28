@@ -133,7 +133,12 @@ protected:
 	XrSessionState m_sessionState = XR_SESSION_STATE_UNKNOWN;
 	XrExtensionMap m_availableExtensions;
 	XrExtensionMap m_activeExtensions;
+	XrSystemProperties m_systemProperties;
 	bool m_submitDepthLayer = false;
+
+	bool m_enableHandTrackers = false;
+	XrHandTrackerEXT m_handTrackers[ 2 ];
+	PFN_xrLocateHandJointsEXT m_xrLocateHandJointsEXT = nullptr;
 
 	Diligent::Timer m_frameTimer;
 	double m_prevFrameTime = 0;
