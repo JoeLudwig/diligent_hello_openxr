@@ -11,5 +11,5 @@ add_subdirectory( thirdparty/OpenXR-SDK )
 
 add_compile_options( "/std:c++17" )
 
-add_subdirectory( src )
+add_subdirectory( projects )
 
