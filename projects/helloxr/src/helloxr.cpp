@@ -64,39 +64,38 @@
 #	define VULKAN_SUPPORTED 1
 #endif
 
-#include <Graphics/GraphicsEngine/interface/EngineFactory.h>
+#include <EngineFactory.h>
 
-#include "Graphics/GraphicsEngineD3D11/interface/EngineFactoryD3D11.h"
-#include "Graphics/GraphicsEngineD3D12/interface/EngineFactoryD3D12.h"
-#include "Graphics/GraphicsEngineOpenGL/interface/EngineFactoryOpenGL.h"
-#include "Graphics/GraphicsEngineVulkan/interface/EngineFactoryVk.h"
-#include "Common/interface/AdvancedMath.hpp"
-#include "Common/interface/Timer.hpp"
+#include <EngineFactoryD3D11.h>
+#include <EngineFactoryD3D12.h>
+//#include <EngineFactoryVk.h>
+#include <AdvancedMath.hpp>
+#include <Timer.hpp>
 
-#include "Graphics/GraphicsEngine/interface/RenderDevice.h"
-#include "Graphics/GraphicsEngine/interface/DeviceContext.h"
-#include "Graphics/GraphicsEngine/interface/SwapChain.h"
+#include <RenderDevice.h>
+#include <DeviceContext.h>
+#include <SwapChain.h>
 
-#include "Common/interface/RefCntAutoPtr.hpp"
+#include <RefCntAutoPtr.hpp>
 
-#include "Graphics/GraphicsTools/interface/MapHelper.hpp"
-#include "Graphics/GraphicsTools/interface/GraphicsUtilities.h"
-#include <AssetLoader/interface/GLTFLoader.hpp>
-#include "GLTF_PBR_Renderer.hpp"
-#include <TextureLoader/interface/TextureUtilities.h>
-#include "openxr/openxr.h"
+#include <MapHelper.hpp>
+#include <GraphicsUtilities.h>
+#include <GLTFLoader.hpp>
+#include <GLTF_PBR_Renderer.hpp>
+#include <TextureUtilities.h>
+#include <openxr/openxr.h>
 
 // Make sure the supported OpenXR graphics APIs are defined
 #if D3D11_SUPPORTED
 #include <d3d11.h>
 #	define XR_USE_GRAPHICS_API_D3D11
-#include "Graphics/GraphicsEngineD3D11/interface/RenderDeviceD3D11.h"
+#include <RenderDeviceD3D11.h>
 #endif
 
 #if D3D12_SUPPORTED
 #include <d3d12.h>
 #	define XR_USE_GRAPHICS_API_D3D12
-#include "Graphics/GraphicsEngineD3D12/interface/RenderDeviceD3D12.h"
+#include <RenderDeviceD3D12.h>
 #endif
 
 #if GL_SUPPORTED

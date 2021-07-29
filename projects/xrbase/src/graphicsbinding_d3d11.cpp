@@ -2,7 +2,7 @@
 #if D3D11_SUPPORTED
 #include <d3d11.h>
 #	define XR_USE_GRAPHICS_API_D3D11
-#include "Graphics/GraphicsEngineD3D11/interface/RenderDeviceD3D11.h"
+#include <RenderDeviceD3D11.h>
 
 #include <openxr/openxr_platform.h>
 

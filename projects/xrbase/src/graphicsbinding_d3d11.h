@@ -3,7 +3,7 @@
 #if D3D11_SUPPORTED
 #include "igraphicsbinding.h"
 
-#include "Graphics/GraphicsEngineD3D11/interface/EngineFactoryD3D11.h"
+#include <EngineFactoryD3D11.h>
 
 namespace Diligent
 {

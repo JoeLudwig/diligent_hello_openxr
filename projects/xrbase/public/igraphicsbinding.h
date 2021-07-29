@@ -1,10 +1,10 @@
 #pragma once
 
-#include <Graphics/GraphicsEngine/interface/GraphicsTypes.h>
-#include <Graphics/GraphicsEngine/interface/EngineFactory.h>
-#include <Graphics/GraphicsEngine/interface/RenderDevice.h>
-#include <Graphics/GraphicsEngine/interface/DeviceContext.h>
-#include <Common/interface/RefCntAutoPtr.hpp>
+#include <GraphicsTypes.h>
+#include <EngineFactory.h>
+#include <RenderDevice.h>
+#include <DeviceContext.h>
+#include <RefCntAutoPtr.hpp>
 
 #include <openxr/openxr.h>
 

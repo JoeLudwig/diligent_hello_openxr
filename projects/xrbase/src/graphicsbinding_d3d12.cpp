@@ -2,8 +2,8 @@
 #include <dxgi.h>
 #include <d3d12.h>
 #	define XR_USE_GRAPHICS_API_D3D12
-#include "Graphics/GraphicsEngineD3D12/interface/RenderDeviceD3D12.h"
-#include "Graphics/GraphicsEngineD3D12/interface/DeviceContextD3D12.h"
+#include <RenderDeviceD3D12.h>
+#include <DeviceContextD3D12.h>
 
 #include <openxr/openxr_platform.h>
 

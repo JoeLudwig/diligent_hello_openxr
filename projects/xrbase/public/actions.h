@@ -5,7 +5,7 @@
 #include <vector>
 #include <map>
 
-#include <Common/interface/BasicMath.hpp>
+#include <BasicMath.hpp>
 
 namespace XRDE
 {

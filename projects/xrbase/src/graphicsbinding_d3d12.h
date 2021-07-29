@@ -2,7 +2,7 @@
 
 #include "igraphicsbinding.h"
 
-#include "Graphics/GraphicsEngineD3D12/interface/EngineFactoryD3D12.h"
+#include <EngineFactoryD3D12.h>
 
 namespace Diligent
 {

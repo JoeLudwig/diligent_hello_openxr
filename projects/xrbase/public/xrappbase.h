@@ -29,25 +29,25 @@
 #	define VULKAN_SUPPORTED 1
 #endif
 
-#include <Graphics/GraphicsEngine/interface/EngineFactory.h>
-#include "Common/interface/BasicMath.hpp"
-#include "Common/interface/Timer.hpp"
+#include <EngineFactory.h>
+#include <BasicMath.hpp>
+#include <Timer.hpp>
 
-#include "Graphics/GraphicsEngine/interface/RenderDevice.h"
-#include "Graphics/GraphicsEngine/interface/DeviceContext.h"
-#include "Graphics/GraphicsEngine/interface/SwapChain.h"
+#include <RenderDevice.h>
+#include <DeviceContext.h>
+#include <SwapChain.h>
 
-#include "Common/interface/RefCntAutoPtr.hpp"
+#include <RefCntAutoPtr.hpp>
 
-#include "openxr/openxr.h"
+#include <openxr/openxr.h>
 
 
 #include <openxr/openxr_platform.h>
 #include "graphics_utilities.h"
 #include "igraphicsbinding.h"
 
-#include <AssetLoader/interface/GLTFLoader.hpp>
-#include "GLTF_PBR_Renderer.hpp"
+#include <GLTFLoader.hpp>
+#include <GLTF_PBR_Renderer.hpp>
 
 #include "iapp.h"
 

@@ -36,31 +36,26 @@
 #	define VULKAN_SUPPORTED 1
 #endif
 
-#include "Graphics/GraphicsEngineD3D11/interface/EngineFactoryD3D11.h"
-#include "Graphics/GraphicsEngineD3D12/interface/EngineFactoryD3D12.h"
-#include "Graphics/GraphicsEngineOpenGL/interface/EngineFactoryOpenGL.h"
-#include "Graphics/GraphicsEngineVulkan/interface/EngineFactoryVk.h"
+#include <EngineFactoryD3D11.h>
+#include <EngineFactoryD3D12.h>
+//#include <EngineFactoryVk.h>
 
-#include "Graphics/GraphicsTools/interface/MapHelper.hpp"
-#include <AssetLoader/interface/GLTFLoader.hpp>
-#include <TextureLoader/interface/TextureUtilities.h>
-#include "Graphics/GraphicsTools/interface/GraphicsUtilities.h"
+#include <MapHelper.hpp>
+#include <GLTFLoader.hpp>
+#include <TextureUtilities.h>
+#include <GraphicsUtilities.h>
 
  // Make sure the supported OpenXR graphics APIs are defined
 #if D3D11_SUPPORTED
 #include <d3d11.h>
 #	define XR_USE_GRAPHICS_API_D3D11
-#include "Graphics/GraphicsEngineD3D11/interface/RenderDeviceD3D11.h"
+#include <RenderDeviceD3D11.h>
 #endif
 
 #if D3D12_SUPPORTED
 #include <d3d12.h>
 #	define XR_USE_GRAPHICS_API_D3D12
-#include "Graphics/GraphicsEngineD3D12/interface/RenderDeviceD3D12.h"
-#endif
-
-#if GL_SUPPORTED
-#	define XR_USE_GRAPHICS_API_OPENGL
+#include <RenderDeviceD3D12.h>
 #endif
 
 #if VULKAN_SUPPORTED

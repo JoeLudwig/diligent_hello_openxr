@@ -3,8 +3,8 @@
 // float4x4_createProjection was adapted from https://github.com/KhronosGroup/OpenXR-SDK-Source/blob/master/src/common/xr_linear.h
 
 
-#include <Common/interface/BasicMath.hpp>
-#include <Graphics/GraphicsEngine/interface/GraphicsTypes.h>
+#include <BasicMath.hpp>
+#include <GraphicsTypes.h>
 
 // Creates a projection matrix based on the specified dimensions.
 // The projection matrix transforms -Z=forward, +Y=up, +X=right to the appropriate clip space for the graphics API.

@@ -27,14 +27,6 @@ target_compile_definitions( xrbase
 
 target_include_directories(xrbase 
 PUBLIC
-	"../../thirdparty/DiligentEngine/DiligentCore"
-	"../../thirdparty/DiligentEngine/DiligentFx"
-	"../../thirdparty/DiligentEngine/DiligentTools"
-	"../../thirdparty/OpenXR-SDK/include"
-
-	# for VulkanHeaders
-	"../../thirdparty/DiligentEngine/DiligentCore/ThirdParty/Vulkan-Headers/include"
-
 	"public"
 )
 
@@ -48,6 +40,8 @@ PUBLIC
 #	Diligent-GraphicsEngineVk-shared
 	Diligent-Win32Platform
 	Diligent-Common
+	Diligent-AssetLoader
+	Diligent-TextureLoader
 	DiligentFX
 	openxr_loader
 	DXGI
