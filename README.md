@@ -25,9 +25,6 @@ Add a command line argument to select the graphics API to use:
 D3D11 and D3D12 on Windows.
 
 Additional features I would like to add:
-* Submitting images from the depth swapchain where supported
-* Cubes attached to the left and right controller
-* A few actions to demonstrate input
 * Linux support
 * Vulkan support
 
