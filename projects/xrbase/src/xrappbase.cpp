@@ -701,7 +701,7 @@ bool XrAppBase::RunXrFrame( XrTime *displayTime )
 			float4x4 stageToEye = eyeToStage.Inverse();
 
 			UpdateEyeTransforms( eyeToProj, stageToEye, views[ i ] );
-			UpdateGltfEyeTransforms( eyeToProj, stageToEye, views[ i ], k_nearClip, k_farClip );
+			UpdateGltfBuffers( eyeToProj, stageToEye, views[ i ], k_nearClip, k_farClip );
 
 			// Clear the back buffer
 			auto& eyeBuffer = m_rpEyeSwapchainViews[ i ][ colorIndex ];
@@ -884,21 +884,29 @@ void XrAppBase::SetPbrEnvironmentMap( const std::string& environmentMapPath )
 }
 
 
-void XrAppBase::UpdateGltfEyeTransforms( float4x4 eyeToProj, float4x4 stageToEye, XrView& view, float nearClip, float farClip )
+void XrAppBase::UpdateGltfBuffers( float4x4 eyeToProj, float4x4 stageToEye, XrView& view, float nearClip, float farClip )
 {
-	MapHelper<CameraAttribs> CamAttribs( m_pGraphicsBinding->GetImmediateContext(), m_CameraAttribsCB,
-		MAP_WRITE, MAP_FLAG_DISCARD );
+	{
+		MapHelper<CameraAttribs> CamAttribs( m_pGraphicsBinding->GetImmediateContext(), m_CameraAttribsCB,
+			MAP_WRITE, MAP_FLAG_DISCARD );
 
-	float4x4 stageToProj = stageToEye * eyeToProj;
-	CamAttribs->mProjT = eyeToProj.Transpose();
-	CamAttribs->mViewProjT = stageToProj.Transpose();
-	CamAttribs->mViewProjInvT = stageToProj.Inverse().Transpose();
-	CamAttribs->f4Position = float4( vectorFromXrVector( view.pose.position ), 1 );
+		float4x4 stageToProj = stageToEye * eyeToProj;
+		CamAttribs->mProjT = eyeToProj.Transpose();
+		CamAttribs->mViewProjT = stageToProj.Transpose();
+		CamAttribs->mViewProjInvT = stageToProj.Inverse().Transpose();
+		CamAttribs->f4Position = float4( vectorFromXrVector( view.pose.position ), 1 );
 
-	float2 viewSize = { (float)m_views[ 0 ].recommendedImageRectWidth, (float)m_views[ 0 ].recommendedImageRectHeight };
-	CamAttribs->f4ViewportSize = { viewSize.x, viewSize.y, 1.f / viewSize.x, 1.f / viewSize.y };
-	CamAttribs->f2ViewportOrigin = { 0, 0 };
-	CamAttribs->fNearPlaneZ = nearClip;
-	CamAttribs->fFarPlaneZ = farClip;
+		float2 viewSize = { (float)m_views[ 0 ].recommendedImageRectWidth, (float)m_views[ 0 ].recommendedImageRectHeight };
+		CamAttribs->f4ViewportSize = { viewSize.x, viewSize.y, 1.f / viewSize.x, 1.f / viewSize.y };
+		CamAttribs->f2ViewportOrigin = { 0, 0 };
+		CamAttribs->fNearPlaneZ = nearClip;
+		CamAttribs->fFarPlaneZ = farClip;
+	}
+
+	{
+		MapHelper<LightAttribs> lightAttribs( m_pGraphicsBinding->GetImmediateContext(), m_LightAttribsCB, MAP_WRITE, MAP_FLAG_DISCARD );
+		lightAttribs->f4Direction = float4(0, 0, -1, 0);
+		lightAttribs->f4Intensity = float4(1, 1, 1, 1);
+	}
 }
 

@@ -105,7 +105,7 @@ public:
 protected:
 	void CreateGLTFResourceCache();
 	void CreateGltfRenderer();
-	void UpdateGltfEyeTransforms( float4x4 eyeToProj, float4x4 stageToEye, XrView& view, float nearClip, float farClip );
+	void UpdateGltfBuffers( float4x4 eyeToProj, float4x4 stageToEye, XrView& view, float nearClip, float farClip );
 
 	Diligent::float4x4							  m_ViewToProj;
 
