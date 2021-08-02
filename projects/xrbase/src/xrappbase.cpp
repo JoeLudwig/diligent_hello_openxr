@@ -314,6 +314,7 @@ bool XrAppBase::InitializeOpenXr()
 	}
 
 	XrSystemHandTrackingPropertiesEXT handTrackingProperties = { XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT };
+	m_systemProperties.type = XR_TYPE_SYSTEM_PROPERTIES;
 	if ( IsExtensionActive( XR_EXT_HAND_TRACKING_EXTENSION_NAME ) )
 	{
 		m_systemProperties.next = &handTrackingProperties;
@@ -416,8 +417,8 @@ bool XrAppBase::CreateSession()
 	CHECK_XR_RESULT( xrEnumerateSwapchainImages( m_swapchain, 0, &imageCount, nullptr ) );
 	CHECK_XR_RESULT( xrEnumerateSwapchainImages( m_depthSwapchain, 0, &depthImageCount, nullptr ) );
 
-	std::vector< RefCntAutoPtr<ITexture> > textures = m_pGraphicsBinding->ReadImagesFromSwapchain( m_swapchain );
-	for ( RefCntAutoPtr<ITexture>& pTexture : textures )
+	m_rpColorSwapchainTextures = m_pGraphicsBinding->ReadImagesFromSwapchain( m_swapchain );
+	for ( RefCntAutoPtr<ITexture>& pTexture : m_rpColorSwapchainTextures )
 	{
 		TextureViewDesc viewDesc;
 		viewDesc.ViewType = TEXTURE_VIEW_RENDER_TARGET;
@@ -435,8 +436,8 @@ bool XrAppBase::CreateSession()
 		m_rpEyeSwapchainViews[ 1 ].push_back( pRightEyeView );
 	}
 
-	std::vector< RefCntAutoPtr<ITexture> > depthTextures = m_pGraphicsBinding->ReadImagesFromSwapchain( m_depthSwapchain );
-	for ( RefCntAutoPtr<ITexture>& pTexture : depthTextures )
+	m_rpDepthSwapchainTextures = m_pGraphicsBinding->ReadImagesFromSwapchain( m_depthSwapchain );
+	for ( RefCntAutoPtr<ITexture>& pTexture : m_rpDepthSwapchainTextures )
 	{
 		TextureViewDesc viewDesc;
 		viewDesc.ViewType = TEXTURE_VIEW_DEPTH_STENCIL;
@@ -664,8 +665,8 @@ bool XrAppBase::RunXrFrame( XrTime *displayTime )
 	{
 		// acquire the image index for this swapchain
 		XrSwapchainImageAcquireInfo acquireInfo = { XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
-		uint32_t index, depthIndex;
-		CHECK_XR_RESULT( xrAcquireSwapchainImage( m_swapchain, &acquireInfo, &index ) );
+		uint32_t colorIndex, depthIndex;
+		CHECK_XR_RESULT( xrAcquireSwapchainImage( m_swapchain, &acquireInfo, &colorIndex ) );
 		CHECK_XR_RESULT( xrAcquireSwapchainImage( m_depthSwapchain, &acquireInfo, &depthIndex ) );
 
 		// wait for swap chains
@@ -703,7 +704,7 @@ bool XrAppBase::RunXrFrame( XrTime *displayTime )
 			UpdateGltfEyeTransforms( eyeToProj, stageToEye, views[ i ], k_nearClip, k_farClip );
 
 			// Clear the back buffer
-			auto& eyeBuffer = m_rpEyeSwapchainViews[ i ][ index ];
+			auto& eyeBuffer = m_rpEyeSwapchainViews[ i ][ colorIndex ];
 			auto& depthBuffer = m_rpEyeDepthViews[ i ][ depthIndex ];
 			const float ClearColor[] = { 1.f, 0.350f, 0.350f, 1.0f };
 			m_pGraphicsBinding->GetImmediateContext()->SetRenderTargets( 1, &eyeBuffer, depthBuffer, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
@@ -711,6 +712,18 @@ bool XrAppBase::RunXrFrame( XrTime *displayTime )
 			m_pGraphicsBinding->GetImmediateContext()->ClearDepthStencil( depthBuffer, CLEAR_DEPTH_FLAG, 1.f, 0, RESOURCE_STATE_TRANSITION_MODE_TRANSITION );
 
 			RenderEye( i );
+		}
+
+		// ensure the swapchain images have the resource state required by OpenXR in order to release to the runtime
+		{
+			StateTransitionDesc transitions[ 2 ]; // color and depth
+			transitions[0].pResource = m_rpColorSwapchainTextures[ colorIndex ];
+			transitions[0].NewState = RESOURCE_STATE_RENDER_TARGET;
+			transitions[0].Flags = STATE_TRANSITION_FLAG_UPDATE_STATE;
+			transitions[1].pResource = m_rpDepthSwapchainTextures[ depthIndex ];
+			transitions[1].NewState = RESOURCE_STATE_DEPTH_WRITE;
+			transitions[1].Flags = STATE_TRANSITION_FLAG_UPDATE_STATE;
+			m_pGraphicsBinding->GetImmediateContext()->TransitionResourceStates( 2, transitions );
 		}
 
 		// release the image we just rendered into

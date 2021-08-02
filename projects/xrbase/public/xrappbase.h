@@ -110,7 +110,9 @@ protected:
 	Diligent::float4x4							  m_ViewToProj;
 
 	Diligent::RefCntAutoPtr<Diligent::ISwapChain>	 m_pSwapChain;
+	std::vector< Diligent::RefCntAutoPtr<Diligent::ITexture> >  m_rpColorSwapchainTextures;
 	std::vector< Diligent::RefCntAutoPtr<Diligent::ITextureView> >  m_rpEyeSwapchainViews[ 2 ];
+	std::vector< Diligent::RefCntAutoPtr<Diligent::ITexture> >  m_rpDepthSwapchainTextures;
 	std::vector< Diligent::RefCntAutoPtr<Diligent::ITextureView> >  m_rpEyeDepthViews[ 2 ];
 	Diligent::RENDER_DEVICE_TYPE			m_DeviceType = Diligent::RENDER_DEVICE_TYPE_D3D11;
 	std::unique_ptr<IGraphicsBinding> m_pGraphicsBinding;
