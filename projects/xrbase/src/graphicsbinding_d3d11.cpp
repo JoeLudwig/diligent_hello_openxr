@@ -103,7 +103,7 @@ std::vector< RefCntAutoPtr<ITexture> > GraphicsBinding_D3D11::ReadImagesFromSwap
 	for ( const XrSwapchainImageD3D11KHR& image : images )
 	{
 		RefCntAutoPtr< ITexture > pTexture;
-		GetD3D11Device()->CreateTexture2DFromD3DResource( image.texture, RESOURCE_STATE_UNKNOWN, &pTexture );
+		GetD3D11Device()->CreateTexture2DFromD3DResource( image.texture, RESOURCE_STATE_UNDEFINED, &pTexture );
 		textures.push_back( pTexture );
 	}
 

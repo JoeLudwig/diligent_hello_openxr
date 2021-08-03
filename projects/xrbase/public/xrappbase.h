@@ -105,12 +105,14 @@ public:
 protected:
 	void CreateGLTFResourceCache();
 	void CreateGltfRenderer();
-	void UpdateGltfEyeTransforms( float4x4 eyeToProj, float4x4 stageToEye, XrView& view, float nearClip, float farClip );
+	void UpdateGltfBuffers( float4x4 eyeToProj, float4x4 stageToEye, XrView& view, float nearClip, float farClip );
 
 	Diligent::float4x4							  m_ViewToProj;
 
 	Diligent::RefCntAutoPtr<Diligent::ISwapChain>	 m_pSwapChain;
+	std::vector< Diligent::RefCntAutoPtr<Diligent::ITexture> >  m_rpColorSwapchainTextures;
 	std::vector< Diligent::RefCntAutoPtr<Diligent::ITextureView> >  m_rpEyeSwapchainViews[ 2 ];
+	std::vector< Diligent::RefCntAutoPtr<Diligent::ITexture> >  m_rpDepthSwapchainTextures;
 	std::vector< Diligent::RefCntAutoPtr<Diligent::ITextureView> >  m_rpEyeDepthViews[ 2 ];
 	Diligent::RENDER_DEVICE_TYPE			m_DeviceType = Diligent::RENDER_DEVICE_TYPE_D3D11;
 	std::unique_ptr<IGraphicsBinding> m_pGraphicsBinding;
